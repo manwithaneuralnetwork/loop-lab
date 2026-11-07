@@ -51,6 +51,7 @@ export class ExportDialog {
   private readonly closeButton: HTMLButtonElement;
   private readonly resolutionSelect: HTMLSelectElement;
   private readonly fpsSelect: HTMLSelectElement;
+  private readonly maxDurationInput: HTMLInputElement;
   private readonly nameInput: HTMLInputElement;
   private readonly history: HTMLDivElement;
   private source: ExportSource | null = null;
@@ -88,6 +89,7 @@ export class ExportDialog {
           <label>Name<input class="export-name" value="loop-lab-render"></label>
           <label>Resolution<select class="export-resolution"><option value="720">720p max</option><option value="1080">1080p max</option><option value="original">Original</option></select></label>
           <label>Frame rate<select class="export-fps"><option value="24">24 fps</option><option value="30" selected>30 fps</option><option value="60">60 fps</option></select></label>
+          <label>Max length<input class="export-duration" type="number" min="1" max="300" step="1" value="10"></label>
         </div>
         <div class="export-parameter-header"><strong>Render parameters</strong><span>Snapshot only — your workspace stays unchanged</span></div>
         <div class="export-parameters"></div>
@@ -113,6 +115,7 @@ export class ExportDialog {
     this.closeButton = this.backdrop.querySelector('.export-close') as HTMLButtonElement;
     this.resolutionSelect = this.backdrop.querySelector('.export-resolution') as HTMLSelectElement;
     this.fpsSelect = this.backdrop.querySelector('.export-fps') as HTMLSelectElement;
+    this.maxDurationInput = this.backdrop.querySelector('.export-duration') as HTMLInputElement;
     this.nameInput = this.backdrop.querySelector('.export-name') as HTMLInputElement;
     this.history = this.backdrop.querySelector('.export-history') as HTMLDivElement;
 
@@ -123,6 +126,7 @@ export class ExportDialog {
     this.exportButton.addEventListener('click', () => void this.startExport());
     this.resolutionSelect.addEventListener('change', () => this.updateSummary());
     this.fpsSelect.addEventListener('change', () => this.updateSummary());
+    this.maxDurationInput.addEventListener('input', () => this.updateSummary());
     this.backdrop.addEventListener('click', (event) => {
       if (event.target === this.backdrop && !this.rendering) this.close();
     });
@@ -134,7 +138,7 @@ export class ExportDialog {
   private open(): void {
     this.source = this.getSource();
     this.values = { ...this.source.params };
-    if (this.values.duration == null) this.values.duration = 10;
+    this.maxDurationInput.value = '10';
     this.nameInput.value = `loop-lab-${new Date().toISOString().slice(0, 10)}`;
     this.renderParameters();
     this.renderHistory();
@@ -159,7 +163,7 @@ export class ExportDialog {
     const maxSide = this.resolutionSelect.value === 'original'
       ? Math.max(this.source.worldWidth, this.source.worldHeight)
       : Number(this.resolutionSelect.value);
-    return buildExportPlan(this.source.worldWidth, this.source.worldHeight, this.values, maxSide, Number(this.fpsSelect.value));
+    return buildExportPlan(this.source.worldWidth, this.source.worldHeight, maxSide, Number(this.fpsSelect.value), Number(this.maxDurationInput.value));
   }
 
   private renderHistory(): void {
@@ -175,7 +179,7 @@ export class ExportDialog {
   private updateSummary(): void {
     const plan = this.plan();
     const audio = this.source && Object.values(this.source.assets).some((asset) => asset.startsWith('data:audio/')) ? '  ·  audio' : '';
-    this.summary.textContent = `${plan.width} × ${plan.height}  ·  ${plan.fps} fps  ·  ${plan.duration.toFixed(2).replace(/\.00$/, '')} sec${audio}`;
+    this.summary.textContent = `${plan.width} × ${plan.height}  ·  ${plan.fps} fps  ·  up to ${plan.duration.toFixed(2).replace(/\.00$/, '')} sec${audio}`;
   }
 
   private renderParameters(): void {
@@ -187,10 +191,6 @@ export class ExportDialog {
       if (!groups.has(group)) groups.set(group, []);
       groups.get(group)?.push([key, definition]);
     });
-    if (!('duration' in this.source.schema)) {
-      groups.set('Video', [['duration', { value: 10, min: 1, max: 300, step: 0.5, group: 'Video' }]]);
-    }
-
     groups.forEach((items, group) => {
       const section = document.createElement('section');
       const heading = document.createElement('h3');
@@ -224,7 +224,6 @@ export class ExportDialog {
           if (definition.step != null) input.step = String(definition.step);
           input.addEventListener('input', () => {
             this.values[key] = coerceParameterValue(definition, input.value);
-            if (key === 'duration') this.updateSummary();
           });
           label.append(input);
         }
@@ -282,6 +281,9 @@ export class ExportDialog {
       if (!context) throw new Error('Canvas 2D is unavailable.');
       this.captureCanvas = canvas;
 
+      let renderedFrames = 0;
+      let conditionFinished = false;
+
       const stream = canvas.captureStream(0);
       const track = stream.getVideoTracks()[0] as CanvasCaptureMediaStreamTrack;
       const audioSources = Object.values(this.source.assets).filter((asset) => asset.startsWith('data:audio/'));
@@ -315,10 +317,11 @@ export class ExportDialog {
         window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
         this.setRendering(false);
         this.progress.querySelector('i')?.setAttribute('style', 'width: 100%');
-        this.setStatus(`Export complete — ${formatFileSize(blob.size)} saved.`);
+        const actualDuration = renderedFrames / plan.fps;
+        this.setStatus(`Export complete — ${actualDuration.toFixed(2)}s · ${formatFileSize(blob.size)} saved.`);
         const entry: ExportHistoryEntry = {
           id: crypto.randomUUID(), name: `${cleanName}.webm`, createdAt: new Date().toISOString(), bytes: blob.size,
-          width: plan.width, height: plan.height, fps: plan.fps, duration: plan.duration
+          width: plan.width, height: plan.height, fps: plan.fps, duration: actualDuration
         };
         this.onComplete(entry);
         this.renderHistory();
@@ -332,6 +335,7 @@ export class ExportDialog {
       worker.onmessage = (event: MessageEvent<ExportWorkerResponse>) => {
         const message = event.data;
         if (message.type === 'frame') {
+          renderedFrames = message.frame;
           message.audio.forEach((command) => void this.exportAudio?.play(command));
           context.clearRect(0, 0, plan.width, plan.height);
           context.drawImage(message.bitmap, 0, 0, plan.width, plan.height);
@@ -344,7 +348,9 @@ export class ExportDialog {
           this.setStatus(`Rendering frame ${message.frame.toLocaleString()} of ${message.totalFrames.toLocaleString()} · about ${Math.ceil(remaining)}s left`);
           this.nextFrameTimer = window.setTimeout(() => worker.postMessage({ type: 'next' }), 1000 / plan.fps);
         } else if (message.type === 'complete') {
-          this.setStatus('Finalizing WebM file…');
+          renderedFrames = message.frames;
+          conditionFinished = message.finished;
+          this.setStatus(conditionFinished ? 'Simulation finished — finalizing WebM file…' : 'Maximum length reached — finalizing WebM file…');
           window.setTimeout(() => { if (recorder.state !== 'inactive') recorder.stop(); }, 100);
         } else if (message.type === 'error') this.finishWithError(message.message);
       };

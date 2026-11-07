@@ -63,4 +63,18 @@ describe('SimulationRuntime', () => {
     runtime.seek(1);
     expect(runtime.world.objects[0].position.x).toBe(x);
   });
+
+  it('finishes from a code-defined condition instead of parameter duration', () => {
+    const runtime = new SimulationRuntime(200, 100, 0.25);
+    runtime.load(`
+      export const parameters = { duration: { value: 0.1 } };
+      export function update(world) {
+        if (world.frame >= 2) world.finish("Target reached");
+      }
+    `);
+    runtime.step(); runtime.step(); runtime.step(); runtime.step();
+    expect(runtime.world.finished).toBe(true);
+    expect(runtime.world.finishReason).toBe('Target reached');
+    expect(runtime.elapsed).toBe(0.75);
+  });
 });

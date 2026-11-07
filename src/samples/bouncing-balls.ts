@@ -6,8 +6,6 @@ import { spawnBalls } from "./helpers.js";
 export const parameters = {
   seed:        { value: 42, min: 1, max: 999, step: 1, group: "Simulation" },
   count:       { value: 14, min: 1, max: 50, step: 1, group: "Simulation" },
-  duration:    { value: 20, min: 1, max: 120, step: 1, group: "Simulation" },
-  autoRestart: { value: true, group: "Simulation" },
   gravity:     { value: 520, min: 0, max: 1200, step: 10, group: "Physics" },
   restitution: { value: 0.88, min: 0.2, max: 1, step: 0.01, group: "Physics" },
   speed:       { value: 1, min: 0.25, max: 2, step: 0.05, group: "Physics" },

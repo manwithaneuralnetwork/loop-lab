@@ -52,10 +52,10 @@ function tick(): void {
       flushAudio();
       stepAccumulator -= 1;
     }
-    const duration = Number(runtime.params.duration) || 0;
-    if (duration > 0 && runtime.elapsed >= duration) {
-      if (runtime.params.autoRestart !== false) restart();
-      else { playing = false; send({ type: 'status', playing }); }
+    if (runtime.world.finished) {
+      playing = false;
+      send({ type: 'finished', reason: runtime.world.finishReason, elapsed: runtime.elapsed, frame: runtime.frame });
+      send({ type: 'status', playing });
     }
     renderer?.render(runtime.world);
     if (runtime.frame % 6 === 0) {

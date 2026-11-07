@@ -26,6 +26,16 @@ export function update(world, dt, params) {}
 
 `setup` runs once on start or restart. `update` runs at a fixed 60 Hz simulation step. Preview speed changes how quickly fixed steps are consumed; it does not change `dt`.
 
+Simulation lifetime is code-owned. Call `world.finish(reason)` when a goal, failure state, score, object count, or any other condition completes the simulation:
+
+```js
+export function update(world) {
+  if (world.tagged("target").length === 0) world.finish("All targets cleared");
+}
+```
+
+`world.elapsed` and `world.frame` are available when time is part of that condition, but a `duration` parameter has no special engine behavior. Video export has a separate maximum-length safety ceiling and stops earlier when `world.finish()` is called.
+
 ## World
 
 - `world.width`, `world.height`, and `world.bounds`
@@ -95,6 +105,6 @@ if (ball.hit("bottom") && world.hasAsset("assets/collision.mp3")) {
 }
 ```
 
-The transport bar controls preview mute and master volume. Browsers require a Run, Play, or viewport click before audio starts. The mixer limits each sound to six simultaneous voices and the project to 24 voices, normalizes dense repeats, then runs the mix through a fast compressor and a soft-clipped ceiling of approximately −9.8 dBFS. Timing is preserved without a collision cooldown.
+The transport bar controls preview mute and master volume. Browsers require a Run, Play, or viewport click before audio starts. The mixer allows up to 32 simultaneous voices per sound and 64 for the project, normalizes dense repeats, then runs the mix through a fast compressor and a soft-clipped ceiling of approximately −9.8 dBFS. Playing voices are never stolen or truncated; only excess new voices are declined under pathological load. Timing is preserved without a collision cooldown.
 
 Local WebM exports include project audio through an Opus track when the browser supports it. The export renderer uses the same voice management and output limiter as the live preview.

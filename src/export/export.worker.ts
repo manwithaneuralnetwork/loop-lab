@@ -17,8 +17,8 @@ function send(message: ExportWorkerResponse, transfer: Transferable[] = []): voi
 
 function sendFrame(): void {
   if (!runtime || !renderer || !canvas) return;
-  if (frame >= totalFrames) {
-    send({ type: 'complete' });
+  if (frame >= totalFrames || (frame > 0 && runtime.world.finished)) {
+    send({ type: 'complete', frames: frame, finished: runtime.world.finished });
     return;
   }
   if (frame > 0) {

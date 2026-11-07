@@ -19,5 +19,5 @@ export type ExportWorkerRequest =
 
 export type ExportWorkerResponse =
   | { type: 'frame'; bitmap: ImageBitmap; frame: number; totalFrames: number; audio: AudioCommand[] }
-  | { type: 'complete' }
+  | { type: 'complete'; frames: number; finished: boolean }
   | { type: 'error'; message: string };

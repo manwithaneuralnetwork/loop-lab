@@ -3,7 +3,7 @@ import { buildExportPlan, randomizeParameters } from './export-options';
 
 describe('export options', () => {
   it('fits output to a 720px maximum side while preserving aspect ratio', () => {
-    expect(buildExportPlan(1920, 1080, { duration: 2 })).toEqual({
+    expect(buildExportPlan(1920, 1080, 720, 30, 2)).toEqual({
       width: 720,
       height: 406,
       fps: 30,
@@ -12,7 +12,7 @@ describe('export options', () => {
     });
   });
 
-  it('keeps duration stable while randomizing creative parameters', () => {
+  it('randomizes every exposed creative parameter independently of export length', () => {
     const schema = {
       duration: { value: 20, min: 1, max: 120 },
       count: { value: 10, min: 1, max: 20, step: 1 },
@@ -20,7 +20,7 @@ describe('export options', () => {
       color: { value: '#ff6b2c', type: 'color' as const }
     };
     const values = randomizeParameters(schema, { duration: 8 }, () => 0.25);
-    expect(values.duration).toBe(8);
+    expect(values.duration).toBeGreaterThanOrEqual(1);
     expect(values.count).toBeGreaterThanOrEqual(1);
     expect(values.count).toBeLessThanOrEqual(20);
     expect(values.trails).toBe(false);

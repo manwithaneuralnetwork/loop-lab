@@ -68,13 +68,16 @@ export class SimulationRuntime {
   seek(seconds: number): void {
     this.restart();
     const targetFrame = Math.max(0, Math.round(seconds / this.stepSize));
-    for (let frame = 0; frame < targetFrame; frame += 1) this.step();
+    for (let frame = 0; frame < targetFrame && !this.world.finished; frame += 1) this.step();
   }
 
   step(): void {
+    if (this.world.finished) return;
     this.hooks.update?.(this.world, this.stepSize, this.params);
     this.world.advance(this.stepSize);
     this.elapsed += this.stepSize;
     this.frame += 1;
+    this.world.elapsed = this.elapsed;
+    this.world.frame = this.frame;
   }
 }

@@ -48,7 +48,6 @@ export function randomizeParameters(
   return { ...current, ...Object.fromEntries(Object.entries(schema).map(([key, rawDefinition]) => {
     const definition = isParameterDefinition(rawDefinition) ? rawDefinition : { value: rawDefinition };
     const value = definition.value;
-    if (key === 'duration' || key === 'autoRestart') return [key, current[key] ?? value];
     if (definition.type === 'color' && typeof value === 'string') return [key, randomHexColor(random)];
     if (typeof value === 'number') return [key, randomNumber(definition, random)];
     if (typeof value === 'boolean') return [key, random() >= 0.5];
@@ -59,14 +58,13 @@ export function randomizeParameters(
 export function buildExportPlan(
   worldWidth: number,
   worldHeight: number,
-  params: ParameterValues,
   maxSide = 720,
-  fps = 30
+  fps = 30,
+  maxDuration = 10
 ): ExportPlan {
   const scale = Math.min(1, maxSide / Math.max(worldWidth, worldHeight));
   const even = (value: number) => Math.max(2, Math.round(value * scale / 2) * 2);
-  const durationValue = Number(params.duration);
-  const duration = Number.isFinite(durationValue) ? Math.max(1, Math.min(300, durationValue)) : 10;
+  const duration = Number.isFinite(maxDuration) ? Math.max(1, Math.min(300, maxDuration)) : 10;
   return {
     width: even(worldWidth),
     height: even(worldHeight),

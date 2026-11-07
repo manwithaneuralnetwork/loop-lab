@@ -179,6 +179,10 @@ export class World {
   bounds: Bounds;
   readonly camera: Camera;
   collisionIterations = 2;
+  elapsed = 0;
+  frame = 0;
+  finished = false;
+  finishReason = '';
   readonly input: WorldInput = { pointer: { x: 0, y: 0, down: false }, keys: new Set() };
   private randomSource: () => number;
   private readonly assets: Record<string, string>;
@@ -197,6 +201,11 @@ export class World {
 
   random(min = 0, max = 1): number {
     return min + this.randomSource() * (max - min);
+  }
+
+  finish(reason = 'Complete'): void {
+    this.finished = true;
+    this.finishReason = reason;
   }
 
   circle(options: BodyOptions = {}): Body {

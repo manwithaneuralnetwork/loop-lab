@@ -87,7 +87,9 @@ const editor = createCodeEditor(query<HTMLElement>('#codeEditor'), activeAtStart
   const active = project.files.find((file) => file.id === project.activeFileId);
   if (active?.kind === 'code') active.content = code;
   scheduleSave();
-}, runCode);
+}, runCode, () => project.files.map((file) => file.path));
+
+query<HTMLButtonElement>('.activity div:first-child button:nth-child(2)').addEventListener('click', () => editor.openSearch());
 
 function showFile(file: ProjectFile): void {
   suppressEditorChange = true;
@@ -182,7 +184,7 @@ function renderParameters(schema: ParameterSchema, values: ParameterValues): voi
       section.append(label);
     }); properties.append(section);
   });
-  scrubber.max = String(Number(currentParams.duration) || 60);
+  scrubber.max = String(Math.max(60, Number(scrubber.max) || 60));
 }
 
 function handleRuntimeMessage(message: RuntimeToHostMessage): void {
@@ -196,6 +198,9 @@ function handleRuntimeMessage(message: RuntimeToHostMessage): void {
     playButton.textContent = '▶'; isPlaying = false; setRuntimeStatus('error');
   } else if (message.type === 'status') {
     isPlaying = message.playing; playButton.textContent = isPlaying ? 'Ⅱ' : '▶'; if (!liveStatus.classList.contains('error')) setRuntimeStatus(isPlaying ? 'live' : 'paused');
+  } else if (message.type === 'finished') {
+    addLog(`Simulation finished: ${message.reason}`, 'ok');
+    isPlaying = false; playButton.textContent = '▶'; setRuntimeStatus('paused'); updateTimeline(message.elapsed);
   } else if (message.type === 'audio') {
     audioButton.classList.remove('pulse'); void audioButton.offsetWidth; audioButton.classList.add('pulse');
   } else if (message.type === 'time' && !isScrubbing) updateTimeline(message.elapsed);
@@ -207,8 +212,9 @@ function formatTime(seconds: number): string {
 }
 
 function updateTimeline(elapsed: number): void {
-  const total = Number(currentParams.duration) || 0; const percent = total ? Math.min(100, (elapsed / total) * 100) : 0;
-  timeReadout.innerHTML = total ? `<b>${formatTime(elapsed)}</b> / ${formatTime(total)}` : `<b>${formatTime(elapsed)}</b>`;
+  const range = Math.max(60, Number(scrubber.max) || 60, Math.ceil(elapsed / 10) * 10 + 10);
+  scrubber.max = String(range); const percent = Math.min(100, (elapsed / range) * 100);
+  timeReadout.innerHTML = `<b>${formatTime(elapsed)}</b>`;
   progressBar.style.width = `${percent}%`; playhead.style.left = `${percent}%`; scrubber.value = String(elapsed);
 }
 

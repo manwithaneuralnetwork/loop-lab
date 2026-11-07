@@ -91,6 +91,10 @@
 .audio-controls button.pulse { animation: audio-pulse .22s ease-out; }
 .audio-controls input { width: 42px; height: 2px; accent-color: var(--orange); cursor: pointer; }
 @keyframes audio-pulse { 0% { border-color: var(--orange); color: var(--orange); box-shadow: 0 0 0 0 #ff6b2c55; } 100% { box-shadow: 0 0 0 5px transparent; } }
+.loop-doc-tooltip { max-width: 310px; padding: 9px 10px; }
+.loop-doc-tooltip strong { color: var(--orange); font: 10px "DM Mono"; }
+.loop-doc-tooltip code { margin-left: 8px; color: #aeb3bb; font: 9px "DM Mono"; }
+.loop-doc-tooltip p { margin: 6px 0 0; color: #959aa2; font-size: 10px; line-height: 1.45; }
 .chevron-down { display: inline-block; flex: 0 0 auto; width: 5px; height: 5px; margin: -2px 3px 0 1px; border-right: 1px solid currentColor; border-bottom: 1px solid currentColor; transform: rotate(45deg); vertical-align: middle; }
 .properties h3 { gap: 6px; }
 #codeEditor .cm-gutters { padding-top: 0 !important; }
@@ -230,7 +234,7 @@
 .logs .source-log em { float: right; color: #ff9b70; font: 8px "DM Mono"; font-style: normal; }
 
 /* Expanded WebM options */
-.export-settings { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 8px; margin: 0 16px 11px; }
+.export-settings { display: grid; grid-template-columns: 1.4fr repeat(3,1fr); gap: 8px; margin: 0 16px 11px; }
 .export-settings label { display: grid; gap: 5px; color: #777d85; font-size: 8px; }
 .export-settings input, .export-settings select { width: 100%; height: 29px; padding: 0 8px; border: 1px solid #373b41; border-radius: 3px; outline: 0; background: #111315; color: #deddd9; font: 9px "DM Mono"; }
 .export-settings input:focus, .export-settings select:focus { border-color: #8b4b30; }

@@ -14,8 +14,8 @@ export class AudioEngine {
   constructor(
     context: AudioContext | null = null,
     private readonly destination: AudioNode | null = null,
-    private readonly maxVoices = 24,
-    private readonly maxVoicesPerSource = 6
+    private readonly maxVoices = 64,
+    private readonly maxVoicesPerSource = 32
   ) {
     this.context = context;
   }
@@ -47,7 +47,7 @@ export class AudioEngine {
     if (context.state !== 'running') return;
     try {
       const buffer = await this.load(command.source);
-      this.trimVoices(command.source);
+      if (!this.hasVoiceCapacity(command.source)) return;
       const source = context.createBufferSource();
       const gain = context.createGain();
       const pan = context.createStereoPanner();
@@ -118,18 +118,9 @@ export class AudioEngine {
     return loading;
   }
 
-  private trimVoices(key: string): void {
-    const stopOldest = (voices: Array<{ source: AudioBufferSourceNode; key: string; startedAt: number }>) => {
-      const oldest = voices.sort((a, b) => a.startedAt - b.startedAt)[0];
-      if (!oldest) return;
-      try { oldest.source.stop(); } catch { /* already stopped */ }
-      const index = this.voices.indexOf(oldest);
-      if (index >= 0) this.voices.splice(index, 1);
-    };
-    while (this.voices.filter((voice) => voice.key === key).length >= this.maxVoicesPerSource) {
-      stopOldest(this.voices.filter((voice) => voice.key === key));
-    }
-    while (this.voices.length >= this.maxVoices) stopOldest([...this.voices]);
+  private hasVoiceCapacity(key: string): boolean {
+    return this.voices.length < this.maxVoices
+      && this.voices.filter((voice) => voice.key === key).length < this.maxVoicesPerSource;
   }
 
   private static limiterCurve(): Float32Array<ArrayBuffer> {

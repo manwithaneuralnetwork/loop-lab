@@ -38,6 +38,7 @@ export type RuntimeToHostMessage =
   | { type: 'parameters'; schema: ParameterSchema; params: ParameterValues }
   | { type: 'log'; level: 'ok' | 'info'; message: string }
   | { type: 'audio'; command: AudioCommand }
+  | { type: 'finished'; reason: string; elapsed: number; frame: number }
   | { type: 'error'; message: string; stack?: string; file?: string; line?: number; column?: number }
   | { type: 'status'; playing: boolean }
   | { type: 'time'; elapsed: number; frame: number; objectCount: number };

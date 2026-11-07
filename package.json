@@ -16,7 +16,10 @@
     "vitest": "^5.1.0"
   },
   "dependencies": {
+    "@codemirror/autocomplete": "^6.20.4",
     "@codemirror/lang-javascript": "^6.2.5",
+    "@codemirror/lint": "^6.9.7",
+    "@codemirror/search": "^6.7.2",
     "codemirror": "^6.0.2"
   }
 }
