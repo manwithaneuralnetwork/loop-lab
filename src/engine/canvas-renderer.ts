@@ -2,6 +2,8 @@ import type { World } from './world';
 
 export class CanvasRenderer {
   private readonly context: OffscreenCanvasRenderingContext2D;
+  private pixelWidth = 1;
+  private pixelHeight = 1;
 
   constructor(private readonly canvas: OffscreenCanvas) {
     const context = canvas.getContext('2d');
@@ -12,11 +14,15 @@ export class CanvasRenderer {
   resize(width: number, height: number): void {
     this.canvas.width = width;
     this.canvas.height = height;
+    this.pixelWidth = width;
+    this.pixelHeight = height;
   }
 
   render(world: World): void {
     const ctx = this.context;
-    ctx.clearRect(0, 0, world.width, world.height);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, this.pixelWidth, this.pixelHeight);
+    ctx.setTransform(this.pixelWidth / world.width, 0, 0, this.pixelHeight / world.height, 0, 0);
     ctx.fillStyle = world.background;
     ctx.fillRect(0, 0, world.width, world.height);
     for (const body of world.objects) {
@@ -48,5 +54,6 @@ export class CanvasRenderer {
     }
     ctx.shadowBlur = 0;
     ctx.globalAlpha = 1;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
   }
 }

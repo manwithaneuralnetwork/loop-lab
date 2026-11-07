@@ -6,6 +6,7 @@ import { isParameterDefinition } from './engine/parameters';
 import { loadProject, saveProject } from './project-store';
 import { RuntimeBridge } from './runtime-bridge';
 import { BOUNCING_BALLS_CODE } from './samples/bouncing-balls';
+import { ExportDialog } from './export/export-dialog';
 
 function query<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -32,6 +33,7 @@ const properties = query<HTMLElement>('.properties');
 const saveState = query<HTMLElement>('.crumbs em');
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let currentSchema: ParameterSchema = {};
 let currentParams: ParameterValues = {};
 let pendingCode: string | null = null;
 let initialRunComplete = false;
@@ -65,6 +67,14 @@ setSaveState(true);
 
 const runtime = new RuntimeBridge(viewport, handleRuntimeMessage, project.worldWidth, project.worldHeight);
 runtime.start();
+
+new ExportDialog(query<HTMLButtonElement>('.export-button'), () => ({
+  code: editor.getCode(),
+  schema: currentSchema,
+  params: { ...currentParams },
+  worldWidth: project.worldWidth,
+  worldHeight: project.worldHeight
+}));
 
 function stamp(): string {
   return new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -103,6 +113,7 @@ function updateParameter(key: string, value: ParameterValue): void {
 }
 
 function renderParameters(schema: ParameterSchema, values: ParameterValues): void {
+  currentSchema = schema;
   currentParams = { ...values };
   properties.innerHTML = '';
   const groups = new Map<string, Array<[string, ParameterDefinition]>>();

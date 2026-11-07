@@ -11,6 +11,8 @@ The implementation is split into typed boundaries:
 - `src/main.ts` coordinates workspace UI state without owning engine behavior.
 - `src/project-store.ts`, `src/code-editor.ts`, and `src/samples/` keep storage, editing, and starter code independent.
 
+Video export is local-only in this version. The export dialog snapshots the current code and parameter values, supports per-export overrides and randomized creative parameters, and renders a deterministic 30 fps WebM in a separate worker. Output is capped at a 720px maximum side to keep browser rendering practical; no project or cloud data is involved.
+
 ## Local development
 
 ```bash
