@@ -1,10 +1,12 @@
 import type { HostToRuntimeMessage, RuntimeToHostMessage } from './engine/protocol';
+import { AudioEngine } from './audio-engine';
 
 type RuntimeListener = (message: RuntimeToHostMessage) => void;
 
 export class RuntimeBridge {
   private worker: Worker | null = null;
   private canvas: HTMLCanvasElement | null = null;
+  private readonly audio = new AudioEngine();
   private readonly handleKeyDown = (event: KeyboardEvent) => this.handleKey(event, true);
   private readonly handleKeyUp = (event: KeyboardEvent) => this.handleKey(event, false);
 
@@ -23,7 +25,10 @@ export class RuntimeBridge {
     this.viewport.prepend(this.canvas);
     const offscreen = this.canvas.transferControlToOffscreen();
     this.worker = new Worker(new URL('./engine/runtime.worker.ts', import.meta.url), { type: 'module' });
-    this.worker.onmessage = (event: MessageEvent<RuntimeToHostMessage>) => this.listener(event.data);
+    this.worker.onmessage = (event: MessageEvent<RuntimeToHostMessage>) => {
+      if (event.data.type === 'audio') void this.audio.play(event.data.command);
+      this.listener(event.data);
+    };
     this.worker.onerror = (event) => this.listener({ type: 'error', message: event.message });
     this.canvas.addEventListener('pointermove', (event) => this.postPointer(event));
     this.canvas.addEventListener('pointerdown', (event) => { this.canvas?.setPointerCapture(event.pointerId); this.canvas?.focus(); this.postPointer(event, true); });
@@ -34,6 +39,11 @@ export class RuntimeBridge {
   }
 
   replace(): void { this.start(); }
+
+  resumeAudio(): Promise<void> { return this.audio.resume(); }
+  setAudioVolume(value: number): void { this.audio.setVolume(value); }
+  setAudioMuted(muted: boolean): void { this.audio.setMuted(muted); }
+  isAudioMuted(): boolean { return this.audio.isMuted(); }
 
   resize(width: number, height: number): void {
     this.width = width;
@@ -69,4 +79,6 @@ export class RuntimeBridge {
     this.canvas?.remove();
     this.canvas = null;
   }
+
+  destroy(): void { this.dispose(); this.audio.dispose(); }
 }

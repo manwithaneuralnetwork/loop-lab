@@ -12,7 +12,8 @@ export const parameters = {
   restitution: { value: 0.88, min: 0.2, max: 1, step: 0.01, group: "Physics" },
   speed:       { value: 1, min: 0.25, max: 2, step: 0.05, group: "Physics" },
   trails:      { value: true, group: "Appearance" },
-  ballColor:   { value: "#ff6b2c", type: "color", group: "Appearance" }
+  ballColor:   { value: "#ff6b2c", type: "color", group: "Appearance" },
+  collisionVolume: { value: 0.28, min: 0, max: 1, step: 0.05, group: "Audio" }
 };
 
 export function setup(world, params) {
@@ -24,6 +25,13 @@ export function setup(world, params) {
 export function update(world, dt, params) {
   for (const ball of world.objects) {
     if (ball.kind !== "circle") continue;
+    if (ball.hit("bottom") && world.hasAsset("assets/collision.mp3")) {
+      world.playSound("assets/collision.mp3", {
+        volume: params.collisionVolume,
+        rate: world.random(0.92, 1.08),
+        pan: (ball.position.x / world.width) * 2 - 1
+      });
+    }
     ball.velocity.y += params.gravity * dt;
     ball.restitution = params.restitution;
     if (world.input.pointer.down) {

@@ -12,6 +12,9 @@ let stepAccumulator = 0;
 let timer: ReturnType<typeof setInterval> | null = null;
 
 function send(message: RuntimeToHostMessage): void { workerScope.postMessage(message); }
+function flushAudio(): void {
+  runtime.world.drainAudio().forEach((command) => send({ type: 'audio', command }));
+}
 function fail(error: unknown): void {
   playing = false;
   const value = error instanceof Error ? error : new Error(String(error));
@@ -30,6 +33,7 @@ function reportLoaded(): void {
   send({ type: 'parameters', schema: runtime.schema, params: runtime.params });
   send({ type: 'log', level: 'ok', message: `Simulation initialized with seed ${runtime.params.seed ?? 1}` });
   send({ type: 'log', level: 'info', message: `Created ${runtime.world.objects.length} objects` });
+  flushAudio();
 }
 
 function restart(): void {
@@ -45,6 +49,7 @@ function tick(): void {
     stepAccumulator += playbackRate;
     while (stepAccumulator >= 1) {
       runtime.step();
+      flushAudio();
       stepAccumulator -= 1;
     }
     const duration = Number(runtime.params.duration) || 0;
@@ -83,6 +88,7 @@ workerScope.onmessage = (event: MessageEvent<HostToRuntimeMessage>) => {
     } else if (message.type === 'seek') {
       playing = false;
       runtime.seek(message.seconds);
+      runtime.world.drainAudio();
       renderer?.render(runtime.world);
       send({ type: 'status', playing: false });
       send({ type: 'time', elapsed: runtime.elapsed, frame: runtime.frame, objectCount: runtime.world.objects.length });
@@ -91,6 +97,7 @@ workerScope.onmessage = (event: MessageEvent<HostToRuntimeMessage>) => {
     } else if (message.type === 'step') {
       playing = false;
       runtime.step();
+      flushAudio();
       renderer?.render(runtime.world);
       send({ type: 'time', elapsed: runtime.elapsed, frame: runtime.frame, objectCount: runtime.world.objects.length });
     } else if (message.type === 'params') runtime.updateParameters(message.params);

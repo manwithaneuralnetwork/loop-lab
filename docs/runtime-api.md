@@ -36,9 +36,25 @@ export function update(world, dt, params) {}
 - `world.sprite({ asset, x, y, width, height, rotation, opacity })`
 - `world.text({ text, x, y, fontSize, font, color, align })`
 - `world.asset(path)` — resolves an imported asset to its local data URL
+- `world.hasAsset(path)` — checks whether an optional asset exists
+- `world.remove(bodyOrId)`, `body.destroy()` — immediate or deferred removal
+- `world.find(idOrName)`, `world.tagged(tag)` — object lookup
+- `world.overlaps(a, b)`, `world.queryPoint(x, y)`, `world.queryBounds(bounds)`
+- `world.playSound(path, { volume, rate, pan, loop })` — preview audio
 - `world.clear()`
 
-All renderable objects expose `position`, `velocity`, `color`, `rotation`, and `opacity`. Circles and rectangles may set `bounce`, `restitution`, and `trail`.
+All renderable objects expose a stable `id`, plus `position`, `velocity`, `color`, `rotation`, `opacity`, `name`, `layer`, `visible`, `active`, and `tags`. Circles and rectangles may set `bounce`, `restitution`, and `trail`. `body.hit("bottom")` and the other boundary names report the previous fixed step's boundary contact.
+
+Objects render from the lowest layer to the highest. Insertion order is preserved inside a layer.
+
+## Camera
+
+The camera defaults to the world origin at 1× zoom. Pointer coordinates remain in world space while the camera moves:
+
+```js
+world.camera.zoom = 1.5;
+world.camera.centerOn(player.position.x, player.position.y);
+```
 
 ## Input
 
@@ -69,4 +85,12 @@ world.sprite({
 });
 ```
 
-Sprites are preloaded before video export begins. Audio playback is not part of this runtime slice yet.
+Sprites are preloaded before video export begins. Imported audio can be triggered from deterministic simulation events:
+
+```js
+if (ball.hit("bottom") && world.hasAsset("assets/collision.mp3")) {
+  world.playSound("assets/collision.mp3", { volume: 0.3, pan: 0 });
+}
+```
+
+The transport bar controls preview mute and master volume. Browsers require a Run, Play, or viewport click before audio starts. WebM exports remain silent in this milestone; audio muxing is a separate export concern.

@@ -32,6 +32,8 @@ const playhead = query<HTMLElement>('.timeline span');
 const gridButton = query<HTMLButtonElement>('.grid-button');
 const fullscreenButton = query<HTMLButtonElement>('.stage-tools button[title="Fullscreen"]');
 const speedButton = query<HTMLButtonElement>('.transport .speed');
+const audioButton = query<HTMLButtonElement>('.audio-controls button');
+const audioVolume = query<HTMLInputElement>('.audio-controls input');
 const worldWidthInput = query<HTMLInputElement>('#worldWidth');
 const worldHeightInput = query<HTMLInputElement>('#worldHeight');
 const logs = query<HTMLElement>('.logs');
@@ -146,6 +148,7 @@ function setRuntimeStatus(status: 'live' | 'paused' | 'error'): void {
 }
 
 function runCode(): void {
+  void runtime.resumeAudio();
   const entry = entryFile();
   if (project.activeFileId === entry.id) entry.content = editor.getCode();
   void persistProject(); pendingCode = entry.content; logs.innerHTML = ''; errors = 0; problemCount.textContent = '0';
@@ -193,6 +196,8 @@ function handleRuntimeMessage(message: RuntimeToHostMessage): void {
     playButton.textContent = '▶'; isPlaying = false; setRuntimeStatus('error');
   } else if (message.type === 'status') {
     isPlaying = message.playing; playButton.textContent = isPlaying ? 'Ⅱ' : '▶'; if (!liveStatus.classList.contains('error')) setRuntimeStatus(isPlaying ? 'live' : 'paused');
+  } else if (message.type === 'audio') {
+    audioButton.classList.remove('pulse'); void audioButton.offsetWidth; audioButton.classList.add('pulse');
   } else if (message.type === 'time' && !isScrubbing) updateTimeline(message.elapsed);
 }
 
@@ -208,9 +213,16 @@ function updateTimeline(elapsed: number): void {
 }
 
 runButton.addEventListener('click', runCode);
-restartButton.addEventListener('click', () => runtime.post({ type: 'restart' }));
-playButton.textContent = 'Ⅱ'; playButton.addEventListener('click', () => { isPlaying = !isPlaying; runtime.post({ type: 'play', playing: isPlaying }); });
+restartButton.addEventListener('click', () => { void runtime.resumeAudio(); runtime.post({ type: 'restart' }); });
+playButton.textContent = 'Ⅱ'; playButton.addEventListener('click', () => { void runtime.resumeAudio(); isPlaying = !isPlaying; runtime.post({ type: 'play', playing: isPlaying }); });
 stepButton.addEventListener('click', () => { isPlaying = false; runtime.post({ type: 'step' }); });
+viewport.addEventListener('pointerdown', () => void runtime.resumeAudio(), { once: true });
+audioButton.addEventListener('click', () => {
+  const muted = !runtime.isAudioMuted(); runtime.setAudioMuted(muted);
+  audioButton.classList.toggle('muted', muted); audioButton.setAttribute('aria-pressed', String(muted));
+  audioButton.textContent = muted ? '×' : '♪';
+});
+audioVolume.addEventListener('input', () => { runtime.setAudioVolume(Number(audioVolume.value)); if (runtime.isAudioMuted()) audioButton.click(); });
 
 const scrubber = document.createElement('input');
 scrubber.className = 'timeline-scrubber'; scrubber.type = 'range'; scrubber.min = '0'; scrubber.max = '60'; scrubber.step = String(1 / 60); scrubber.value = '0'; timeline.append(scrubber);
@@ -247,4 +259,4 @@ let dimensionTimer: ReturnType<typeof setTimeout> | null = null;
 function scheduleDimensionUpdate(): void { if (dimensionTimer) clearTimeout(dimensionTimer); dimensionTimer = setTimeout(updateDimensions, 250); }
 worldWidthInput.addEventListener('input', scheduleDimensionUpdate); worldHeightInput.addEventListener('input', scheduleDimensionUpdate);
 
-window.addEventListener('beforeunload', () => { void persistProject(); runtime.dispose(); editor.destroy(); });
+window.addEventListener('beforeunload', () => { void persistProject(); runtime.destroy(); editor.destroy(); });

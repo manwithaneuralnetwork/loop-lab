@@ -46,10 +46,13 @@ export class CanvasRenderer {
     const ctx = this.context;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, this.pixelWidth, this.pixelHeight);
-    ctx.setTransform(this.pixelWidth / world.width, 0, 0, this.pixelHeight / world.height, 0, 0);
     ctx.fillStyle = world.background;
-    ctx.fillRect(0, 0, world.width, world.height);
-    for (const body of world.objects) {
+    ctx.fillRect(0, 0, this.pixelWidth, this.pixelHeight);
+    const scaleX = this.pixelWidth / world.width;
+    const scaleY = this.pixelHeight / world.height;
+    ctx.setTransform(scaleX * world.camera.zoom, 0, 0, scaleY * world.camera.zoom, -world.camera.x * scaleX * world.camera.zoom, -world.camera.y * scaleY * world.camera.zoom);
+    const objects = world.objects.filter((body) => body.visible && !body.destroyed).map((body, index) => ({ body, index })).sort((a, b) => a.body.layer - b.body.layer || a.index - b.index);
+    for (const { body } of objects) {
       if (body.trail.length) {
         body.trail.forEach((point, index) => {
           ctx.globalAlpha = ((index + 1) / body.trail.length) * 0.23;

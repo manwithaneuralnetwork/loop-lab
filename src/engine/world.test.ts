@@ -16,6 +16,47 @@ describe('World', () => {
     world.advance(0.1);
     expect(ball.position.x).toBe(95);
     expect(ball.velocity.x).toBe(-10);
+    expect(ball.hit('right')).toBe(true);
+  });
+
+  it('supports stable lifecycle helpers, tags, and deferred destruction', () => {
+    const world = new World(100, 100);
+    const player = world.circle({ name: 'player', tags: ['actor'], layer: 2 });
+    const wall = world.rectangle({ x: 5, y: 5, width: 20, height: 20, tags: ['solid'] });
+    expect(player.id).toBe('body-1');
+    expect(world.find('player')).toBe(player);
+    expect(world.tagged('solid')).toEqual([wall]);
+    expect(world.queryPoint(5, 5)).toContain(wall);
+    player.destroy();
+    world.advance(0);
+    expect(world.objects).toEqual([wall]);
+  });
+
+  it('queries overlaps and bounds', () => {
+    const world = new World(100, 100);
+    const first = world.circle({ x: 20, y: 20, radius: 10 });
+    const second = world.rectangle({ x: 28, y: 20, width: 10, height: 10 });
+    expect(world.overlaps(first, second)).toBe(true);
+    expect(world.queryBounds({ left: 0, top: 0, right: 25, bottom: 25 })).toContain(first);
+    expect(world.remove(second.id)).toBe(true);
+    expect(world.objects).toEqual([first]);
+  });
+
+  it('maps pointer coordinates through the camera', () => {
+    const world = new World(200, 100);
+    world.camera.zoom = 2;
+    world.camera.centerOn(100, 50);
+    world.updateInput({ x: 100, y: 50, down: true });
+    expect(world.input.pointer).toEqual({ x: 100, y: 50, down: true });
+  });
+
+  it('queues resolved audio commands with safe playback values', () => {
+    const world = new World(100, 100, 1, { 'assets/hit.mp3': 'data:audio/mpeg;base64,abc' });
+    world.playSound('assets/hit.mp3', { volume: 3, rate: 0.1, pan: -2 });
+    expect(world.drainAudio()).toEqual([{
+      id: 'sound-1', source: 'data:audio/mpeg;base64,abc', volume: 1, rate: 0.25, loop: false, pan: -1
+    }]);
+    expect(world.drainAudio()).toEqual([]);
   });
 
   it('updates world dimensions without discarding objects', () => {

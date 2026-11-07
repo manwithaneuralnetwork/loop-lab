@@ -12,6 +12,15 @@ export interface ParameterDefinition {
 export type ParameterSchema = Record<string, ParameterDefinition | ParameterValue>;
 export type ParameterValues = Record<string, ParameterValue>;
 
+export interface AudioCommand {
+  id: string;
+  source: string;
+  volume: number;
+  rate: number;
+  loop: boolean;
+  pan: number;
+}
+
 export type HostToRuntimeMessage =
   | { type: 'init'; canvas: OffscreenCanvas; width: number; height: number }
   | { type: 'run'; code: string; params: ParameterValues; files?: Record<string, string>; assets?: Record<string, string>; entry?: string }
@@ -28,6 +37,7 @@ export type RuntimeToHostMessage =
   | { type: 'ready' }
   | { type: 'parameters'; schema: ParameterSchema; params: ParameterValues }
   | { type: 'log'; level: 'ok' | 'info'; message: string }
+  | { type: 'audio'; command: AudioCommand }
   | { type: 'error'; message: string; stack?: string; file?: string; line?: number; column?: number }
   | { type: 'status'; playing: boolean }
   | { type: 'time'; elapsed: number; frame: number; objectCount: number };

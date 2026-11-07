@@ -24,6 +24,7 @@ function sendFrame(): void {
   if (frame > 0) {
     for (let step = 0; step < stepsPerFrame; step += 1) runtime.step();
   }
+  runtime.world.drainAudio();
   renderer.render(runtime.world);
   const bitmap = canvas.transferToImageBitmap();
   send({ type: 'frame', bitmap, frame: frame + 1, totalFrames }, [bitmap]);
@@ -37,6 +38,7 @@ scope.onmessage = (event: MessageEvent<ExportWorkerRequest>) => {
       runtime = new SimulationRuntime(message.worldWidth, message.worldHeight);
       if (message.files) runtime.loadProject(message.files, message.entry || 'simulation.js', message.params, message.assets);
       else runtime.load(message.code, message.params);
+      runtime.world.drainAudio();
       canvas = new OffscreenCanvas(message.outputWidth, message.outputHeight);
       renderer = new CanvasRenderer(canvas);
       renderer.resize(message.outputWidth, message.outputHeight);
