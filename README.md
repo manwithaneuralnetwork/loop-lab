@@ -2,7 +2,7 @@
 
 Loop Lab is a browser-based creative studio for building programmable 2D games, simulations, and visual experiments.
 
-The current repository contains the approved workspace shell and the first engine vertical slice: editable JavaScript runs in a sandboxed Web Worker, renders to an `OffscreenCanvas`, exposes code-declared parameters in the UI, and supports deterministic playback controls.
+The current repository contains the approved workspace shell and the first engine vertical slice: JavaScript edited in CodeMirror runs in a sandboxed Web Worker, renders to an `OffscreenCanvas`, exposes code-declared parameters in the UI, and supports deterministic playback controls. Project code and parameter overrides autosave locally between sessions.
 
 ## Local development
 
@@ -17,6 +17,12 @@ Then open the local URL printed by Vite.
 
 ```bash
 npm run build
+```
+
+Run the combined syntax and production-build check with:
+
+```bash
+npm run check
 ```
 
 See `handoff.md` for the product brief and longer-term scope.

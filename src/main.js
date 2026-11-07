@@ -1,3 +1,10 @@
+import { basicSetup, EditorView } from 'codemirror';
+import { javascript } from '@codemirror/lang-javascript';
+import { keymap } from '@codemirror/view';
+import { indentWithTab } from '@codemirror/commands';
+import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
+import { tags } from '@lezer/highlight';
+
 const SAMPLE_CODE = `// Loop Lab — Bouncing Balls
 // Edit a value or behavior, then click Run code.
 
@@ -100,7 +107,7 @@ function reset() {
   try {
     const firstPass = compile(code);
     schema = firstPass.parameters || {};
-    if (!Object.keys(params).length) params = defaultsFromSchema(schema);
+    params = { ...defaultsFromSchema(schema), ...params };
     world = createWorld(params.seed || 1);
     hooks = compile(code);
     if (hooks.setup) hooks.setup(world, params);
@@ -166,7 +173,7 @@ onmessage = (event) => {
     canvas.width = width; canvas.height = height; ctx = canvas.getContext("2d");
     timer = setInterval(tick, 1000 / 60); send("ready");
   }
-  if (message.type === "run") { code = message.code; params = {}; playing = true; reset(); }
+  if (message.type === "run") { code = message.code; params = { ...(message.params || {}) }; playing = true; reset(); }
   if (message.type === "restart") { playing = true; reset(); }
   if (message.type === "play") { playing = message.playing; send("status", { playing }); }
   if (message.type === "step") { playing = false; simulateStep(); render(); send("time", { elapsed, frame, objectCount: world.objects.length }); }
@@ -199,25 +206,74 @@ new ResizeObserver(entries => { const r=entries[0].contentRect; worker?.postMess
 <\/script></body></html>`;
 
 const editorBody = document.querySelector('.editor-body');
-editorBody.innerHTML = '<div class="gutter" id="lineNumbers"></div><textarea id="codeEditor" aria-label="Simulation code" spellcheck="false"></textarea>';
-const editor = document.querySelector('#codeEditor');
-const lineNumbers = document.querySelector('#lineNumbers');
-editor.value = SAMPLE_CODE;
+editorBody.innerHTML = '<div id="codeEditor" aria-label="Simulation code"></div>';
 
-function updateLines() {
-  const count = editor.value.split('\n').length;
-  lineNumbers.innerHTML = Array.from({ length: count }, (_, i) => i + 1).join('<br>');
+const STORAGE_KEY = 'loop-lab.project.v1';
+const savedProject = (() => {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); }
+  catch { return null; }
+})();
+const project = {
+  code: savedProject?.code || SAMPLE_CODE,
+  parameterValues: savedProject?.parameterValues || {},
+  gridVisible: savedProject?.gridVisible ?? true
+};
+const saveState = document.querySelector('.crumbs em');
+let saveTimer = null;
+
+function setSaveState(saved) {
+  saveState.textContent = saved ? '● Saved' : '● Unsaved';
+  saveState.classList.toggle('unsaved', !saved);
+  document.querySelector('.tabs .active i').textContent = saved ? '' : '●';
+  document.querySelector('.files .active i').textContent = saved ? '' : '●';
 }
-updateLines();
-editor.addEventListener('input', () => { updateLines(); document.querySelector('.tabs .active i').textContent = '●'; });
-editor.addEventListener('scroll', () => { lineNumbers.scrollTop = editor.scrollTop; });
-editor.addEventListener('keydown', event => {
-  if (event.key === 'Tab') {
-    event.preventDefault(); const start = editor.selectionStart, end = editor.selectionEnd;
-    editor.setRangeText('  ', start, end, 'end'); updateLines();
-  }
-  if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') runCode();
+function persistProject() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(project));
+  setSaveState(true);
+}
+function scheduleSave() {
+  setSaveState(false);
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(persistProject, 450);
+}
+
+const loopHighlight = HighlightStyle.define([
+  { tag: [tags.keyword, tags.modifier], color: '#c7a0ff' },
+  { tag: [tags.function(tags.variableName), tags.definition(tags.variableName)], color: '#e9d18b' },
+  { tag: [tags.string, tags.special(tags.string)], color: '#b6d78b' },
+  { tag: [tags.number, tags.bool, tags.null], color: '#ff7e45' },
+  { tag: [tags.comment, tags.lineComment, tags.blockComment], color: '#6f747c', fontStyle: 'italic' },
+  { tag: [tags.typeName, tags.className], color: '#73c7ff' },
+  { tag: tags.propertyName, color: '#d7d8dc' }
+]);
+const editorTheme = EditorView.theme({
+  '&': { height: '100%', backgroundColor: '#151619', color: '#d7d8dc', fontSize: '12px' },
+  '.cm-scroller': { fontFamily: '"DM Mono", monospace', lineHeight: '1.7', overflow: 'auto' },
+  '.cm-content': { padding: '14px 0', caretColor: '#ff6b2c' },
+  '.cm-gutters': { backgroundColor: '#151619', color: '#50555d', borderRight: '1px solid #222428', paddingTop: '14px' },
+  '.cm-activeLine, .cm-activeLineGutter': { backgroundColor: 'rgba(255,255,255,.025)' },
+  '.cm-selectionBackground, &.cm-focused .cm-selectionBackground': { backgroundColor: 'rgba(255,107,44,.24)' },
+  '.cm-cursor': { borderLeftColor: '#ff6b2c' },
+  '.cm-foldGutter': { display: 'none' }
+}, { dark: true });
+const editor = new EditorView({
+  doc: project.code,
+  extensions: [
+    basicSetup,
+    javascript(),
+    editorTheme,
+    syntaxHighlighting(loopHighlight),
+    keymap.of([indentWithTab, { key: 'Mod-Enter', run: () => { runCode(); return true; } }]),
+    EditorView.updateListener.of(update => {
+      if (!update.docChanged) return;
+      project.code = update.state.doc.toString();
+      scheduleSave();
+    })
+  ],
+  parent: document.querySelector('#codeEditor')
 });
+const getCode = () => editor.state.doc.toString();
+setSaveState(true);
 
 const viewport = document.querySelector('.viewport');
 viewport.querySelector('canvas')?.remove();
@@ -242,7 +298,7 @@ const properties = document.querySelector('.properties');
 let runtimeReady = false;
 let isPlaying = true;
 let currentParams = {};
-let lastCode = SAMPLE_CODE;
+let lastCode = project.code;
 let pendingCode = null;
 let initialRunComplete = false;
 
@@ -256,7 +312,9 @@ function addLog(message, level = 'info') {
 function escapeHTML(value) { const node=document.createElement('div'); node.textContent=String(value); return node.innerHTML; }
 
 function runCode() {
-  lastCode = editor.value;
+  lastCode = getCode();
+  project.code = lastCode;
+  persistProject();
   pendingCode = lastCode;
   logs.innerHTML = '';
   addLog('Compiling simulation…');
@@ -284,12 +342,23 @@ function renderParameters(schema, values) {
       label.append(document.createTextNode(title));
       if (typeof config.value === 'boolean') {
         const toggle = document.createElement('button'); toggle.className = `switch ${currentParams[key] ? 'active' : ''}`; toggle.innerHTML = '<i></i>';
-        toggle.addEventListener('click', () => { currentParams[key] = !currentParams[key]; toggle.classList.toggle('active', currentParams[key]); send({type:'params',params:{[key]:currentParams[key]}}); });
+        toggle.addEventListener('click', () => {
+          currentParams[key] = !currentParams[key];
+          project.parameterValues[key] = currentParams[key];
+          toggle.classList.toggle('active', currentParams[key]);
+          send({type:'params',params:{[key]:currentParams[key]}});
+          scheduleSave();
+        });
         label.append(toggle);
       } else {
         const input = document.createElement('input'); input.value = currentParams[key]; input.type = config.type === 'color' ? 'color' : 'number';
         if (config.min != null) input.min = config.min; if (config.max != null) input.max = config.max; if (config.step != null) input.step = config.step;
-        input.addEventListener('input', () => { currentParams[key] = input.type === 'number' ? Number(input.value) : input.value; send({type:'params',params:{[key]:currentParams[key]}}); });
+        input.addEventListener('input', () => {
+          currentParams[key] = input.type === 'number' ? Number(input.value) : input.value;
+          project.parameterValues[key] = currentParams[key];
+          send({type:'params',params:{[key]:currentParams[key]}});
+          scheduleSave();
+        });
         label.append(input);
       }
       section.append(label);
@@ -304,13 +373,13 @@ window.addEventListener('message', event => {
   if (message.type === 'ready') {
     runtimeReady = true;
     if (pendingCode !== null) {
-      send({ type:'run', code:pendingCode });
+      send({ type:'run', code:pendingCode, params:project.parameterValues });
       pendingCode = null;
       initialRunComplete = true;
     } else if (!initialRunComplete) {
       logs.innerHTML = '';
       addLog('Compiling simulation…');
-      send({ type:'run', code:editor.value });
+      send({ type:'run', code:getCode(), params:project.parameterValues });
       initialRunComplete = true;
     }
   }
@@ -330,4 +399,10 @@ restartButton.addEventListener('click', () => send({type:'restart'}));
 playButton.textContent = 'Ⅱ';
 playButton.addEventListener('click', () => { isPlaying = !isPlaying; playButton.textContent = isPlaying ? 'Ⅱ' : '▶'; send({type:'play',playing:isPlaying}); });
 stepButton.addEventListener('click', () => { isPlaying = false; playButton.textContent = '▶'; send({type:'step'}); });
-gridButton.addEventListener('click', () => { viewport.classList.toggle('grid-off'); gridButton.classList.toggle('inactive'); });
+if (!project.gridVisible) { viewport.classList.add('grid-off'); gridButton.classList.add('inactive'); }
+gridButton.addEventListener('click', () => {
+  project.gridVisible = viewport.classList.toggle('grid-off') === false;
+  gridButton.classList.toggle('inactive', !project.gridVisible);
+  scheduleSave();
+});
+window.addEventListener('beforeunload', persistProject);
