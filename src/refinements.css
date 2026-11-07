@@ -1,0 +1,54 @@
+/* V2 readability and annotation refinements */
+.crumbs { font-size: 11px; }
+.app-actions { gap: 9px; padding-inline: 13px; }
+.app-actions > button { font-size: 15px; }
+.app-actions > i { margin-inline: 2px; }
+.explorer { font-size: 10px; }
+.panel-title .add-button { margin-right: 5px; color: #a3a7ad; font-size: 15px; }
+.panel-title .add-button:hover { color: #fff; }
+.files button { height: 30px; font-size: 11px; }
+.files button .folder-add { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 3px; color: #8c9198; font-size: 14px; }
+.files button .folder-add:hover { background: #35383d; color: #fff; }
+.new-file { height: 30px; color: #aaa; font-size: 10px; }
+.tabs button { font-size: 10px; }
+.tabs button b { color: #858a91; font-size: 13px; line-height: 1; }
+.editor pre { font-size: 12px; scrollbar-width: thin; scrollbar-color: #5a5f66 transparent; }
+.editor pre::-webkit-scrollbar, .properties::-webkit-scrollbar { width: 7px; height: 7px; }
+.editor pre::-webkit-scrollbar-track, .properties::-webkit-scrollbar-track { background: transparent; }
+.editor pre::-webkit-scrollbar-thumb, .properties::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 8px; background: #6a6f76; background-clip: padding-box; }
+.editor pre::-webkit-scrollbar-thumb:hover, .properties::-webkit-scrollbar-thumb:hover { background: #8b9097; background-clip: padding-box; }
+.stagebar button, .stagebar span, .stagebar b { font-size: 10px; }
+.stagebar .stage-title { color: #e0e1e4; font-family: Manrope, sans-serif; font-weight: 600; }
+.inspector { grid-template-rows: 35px 1fr; }
+.inspector-tabs { display: flex; align-items: center; padding: 0 10px; }
+.inspector-tabs h2 { display: block; margin: 0; padding: 0; color: #cfd1d5; font-size: 9px !important; line-height: 1; font-weight: 600; letter-spacing: .03em; }
+.properties h3 { height: 31px; color: #aeb2b8; font-size: 9px; }
+.properties label { min-height: 35px; color: #a7abb2; font-size: 10px; }
+.properties input { font-size: 9px; }
+.console-tabs button { font-size: 10px; }
+.logs { font-size: 10px; }
+.gutter { font-size: 11px; }
+.editor-status { font-size: 9px; }
+.panel-title, .viewport label, .transport p, .transport .speed { font-size: 9px; }
+
+/* Working engine spike */
+.editor-body { grid-template-columns: 42px 1fr; }
+.editor-body .gutter { overflow: hidden; white-space: nowrap; }
+#codeEditor { width: 100%; height: 100%; resize: none; border: 0; outline: 0; padding: 15px 20px; overflow: auto; background: #151619; color: #d7d8dc; caret-color: #ff6b2c; font: 12px/1.7 "DM Mono", monospace; tab-size: 2; white-space: pre; scrollbar-width: thin; scrollbar-color: #5a5f66 transparent; }
+#codeEditor::selection { background: rgba(255,107,44,.28); }
+#codeEditor::-webkit-scrollbar, .logs::-webkit-scrollbar { width: 7px; height: 7px; }
+#codeEditor::-webkit-scrollbar-track, .logs::-webkit-scrollbar-track { background: transparent; }
+#codeEditor::-webkit-scrollbar-thumb, .logs::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 8px; background: #6a6f76; background-clip: padding-box; }
+.runtime-frame { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; border: 0; background: transparent; }
+.viewport label, .viewport > i { z-index: 2; pointer-events: none; }
+.viewport.grid-off { background-image: none; }
+.viewport.grid-off > .x-axis, .viewport.grid-off > .y-axis { display: none; }
+.grid-button.inactive { opacity: .48; }
+.properties button.switch { border: 0; cursor: pointer; }
+.properties button.switch:not(.active) { background: #34373c; }
+.properties button.switch:not(.active) i { margin-left: 0; background: #92969d; }
+.properties input[type="color"] { padding: 2px; cursor: pointer; }
+.logs { overflow: auto; }
+.logs span.error { color: #ff786e; }
+.logs span.ok { color: #80e9a6; }
+.app-actions .primary { min-width: 75px; }
