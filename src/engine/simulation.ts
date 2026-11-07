@@ -66,6 +66,12 @@ export class SimulationRuntime {
     this.world.resize(width, height);
   }
 
+  seek(seconds: number): void {
+    this.restart();
+    const targetFrame = Math.max(0, Math.round(seconds / this.stepSize));
+    for (let frame = 0; frame < targetFrame; frame += 1) this.step();
+  }
+
   step(): void {
     this.hooks.update?.(this.world, this.stepSize, this.params);
     this.world.advance(this.stepSize);

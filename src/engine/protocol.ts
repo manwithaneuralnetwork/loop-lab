@@ -17,6 +17,8 @@ export type HostToRuntimeMessage =
   | { type: 'run'; code: string; params: ParameterValues }
   | { type: 'restart' }
   | { type: 'play'; playing: boolean }
+  | { type: 'speed'; rate: number }
+  | { type: 'seek'; seconds: number }
   | { type: 'step' }
   | { type: 'params'; params: ParameterValues }
   | { type: 'resize'; width: number; height: number };
@@ -25,6 +27,6 @@ export type RuntimeToHostMessage =
   | { type: 'ready' }
   | { type: 'parameters'; schema: ParameterSchema; params: ParameterValues }
   | { type: 'log'; level: 'ok' | 'info'; message: string }
-  | { type: 'error'; message: string; stack?: string }
+  | { type: 'error'; message: string; stack?: string; line?: number; column?: number }
   | { type: 'status'; playing: boolean }
   | { type: 'time'; elapsed: number; frame: number; objectCount: number };

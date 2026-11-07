@@ -52,4 +52,15 @@ describe('SimulationRuntime', () => {
     expect(runtime.params.speed).toBe(32);
     expect(runtime.world.objects[0].velocity.x).toBe(32);
   });
+
+  it('seeks deterministically from the initial state', () => {
+    const runtime = new SimulationRuntime(200, 100, 0.25);
+    runtime.load(source);
+    runtime.seek(1);
+    expect(runtime.elapsed).toBe(1);
+    expect(runtime.frame).toBe(4);
+    const x = runtime.world.objects[0].position.x;
+    runtime.seek(1);
+    expect(runtime.world.objects[0].position.x).toBe(x);
+  });
 });

@@ -11,7 +11,15 @@ The implementation is split into typed boundaries:
 - `src/main.ts` coordinates workspace UI state without owning engine behavior.
 - `src/project-store.ts`, `src/code-editor.ts`, and `src/samples/` keep storage, editing, and starter code independent.
 
-Video export is local-only in this version. The export dialog snapshots the current code and parameter values, supports per-export overrides and randomized creative parameters, and renders a deterministic 30 fps WebM in a separate worker. Output is capped at a 720px maximum side to keep browser rendering practical; no project or cloud data is involved.
+Video export is local-only in this version. The export dialog snapshots the current code and parameter values, supports per-export overrides and randomized creative parameters, and renders deterministic WebM video in a separate worker. Output can use 24, 30, or 60 fps with 720p, 1080p, or original-size bounds; no project or cloud data is involved.
+
+The workspace now persists multiple code files, folders, imported assets, open tabs, and export history. `simulation.js` is the protected runtime entry file; cross-file JavaScript imports are intentionally deferred until a project bundler is introduced. Preview controls support deterministic seeking, 0.25×–4× playback, stepping, runtime status, and fullscreen presentation. WebM exports offer naming, 720p/1080p/original bounds, 24/30/60 fps, progress/ETA, and cancellation.
+
+## Rendering and physics roadmap
+
+Loop Lab currently uses its own small Canvas 2D renderer. **PixiJS is not integrated yet.** Before adding image/sprite APIs, we will evaluate adopting PixiJS as the rendering backend; the engine-facing API should remain Loop Lab’s so projects are not coupled directly to PixiJS.
+
+**Matter.js is not currently installed.** It is on the evaluation list as an optional rigid-body physics backend, not a default dependency. The present lightweight body and boundary helpers are sufficient for simple simulations. Matter.js should be added when we commit to rotation, constraints, compound bodies, and robust collision solving, ideally behind an opt-in `@loop/physics` adapter.
 
 ## Local development
 

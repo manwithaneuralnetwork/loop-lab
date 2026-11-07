@@ -7,13 +7,21 @@ const workerScope = self as unknown as DedicatedWorkerGlobalScope;
 let runtime = new SimulationRuntime(1080, 1080);
 let renderer: CanvasRenderer | null = null;
 let playing = true;
+let playbackRate = 1;
+let stepAccumulator = 0;
 let timer: ReturnType<typeof setInterval> | null = null;
 
 function send(message: RuntimeToHostMessage): void { workerScope.postMessage(message); }
 function fail(error: unknown): void {
   playing = false;
   const value = error instanceof Error ? error : new Error(String(error));
-  send({ type: 'error', message: value.message, stack: value.stack });
+  const sourceLocation = value.stack?.match(/<anonymous>:(\d+):(\d+)/);
+  send({
+    type: 'error', message: value.message, stack: value.stack,
+    line: sourceLocation ? Math.max(1, Number(sourceLocation[1]) - 3) : undefined,
+    column: sourceLocation ? Number(sourceLocation[2]) : undefined
+  });
+  send({ type: 'status', playing: false });
 }
 
 function reportLoaded(): void {
@@ -32,7 +40,11 @@ function restart(): void {
 function tick(): void {
   if (!playing) return;
   try {
-    runtime.step();
+    stepAccumulator += playbackRate;
+    while (stepAccumulator >= 1) {
+      runtime.step();
+      stepAccumulator -= 1;
+    }
     const duration = Number(runtime.params.duration) || 0;
     if (duration > 0 && runtime.elapsed >= duration) {
       if (runtime.params.autoRestart !== false) restart();
@@ -63,6 +75,14 @@ workerScope.onmessage = (event: MessageEvent<HostToRuntimeMessage>) => {
     else if (message.type === 'play') {
       playing = message.playing;
       send({ type: 'status', playing });
+    } else if (message.type === 'speed') {
+      playbackRate = Math.max(0.25, Math.min(4, message.rate));
+    } else if (message.type === 'seek') {
+      playing = false;
+      runtime.seek(message.seconds);
+      renderer?.render(runtime.world);
+      send({ type: 'status', playing: false });
+      send({ type: 'time', elapsed: runtime.elapsed, frame: runtime.frame, objectCount: runtime.world.objects.length });
     } else if (message.type === 'step') {
       playing = false;
       runtime.step();

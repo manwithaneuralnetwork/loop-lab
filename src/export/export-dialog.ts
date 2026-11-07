@@ -2,6 +2,7 @@ import { isParameterDefinition } from '../engine/parameters';
 import type { ParameterDefinition, ParameterSchema, ParameterValue, ParameterValues } from '../engine/protocol';
 import { buildExportPlan, coerceParameterValue, randomizeParameters, type ExportPlan } from './export-options';
 import type { ExportWorkerResponse } from './export-protocol';
+import type { ExportHistoryEntry } from '../project-store';
 
 export interface ExportSource {
   code: string;
@@ -9,6 +10,7 @@ export interface ExportSource {
   params: ParameterValues;
   worldWidth: number;
   worldHeight: number;
+  history: ExportHistoryEntry[];
 }
 
 type SourceProvider = () => ExportSource;
@@ -41,6 +43,10 @@ export class ExportDialog {
   private readonly cancelButton: HTMLButtonElement;
   private readonly exportButton: HTMLButtonElement;
   private readonly closeButton: HTMLButtonElement;
+  private readonly resolutionSelect: HTMLSelectElement;
+  private readonly fpsSelect: HTMLSelectElement;
+  private readonly nameInput: HTMLInputElement;
+  private readonly history: HTMLDivElement;
   private source: ExportSource | null = null;
   private values: ParameterValues = {};
   private worker: Worker | null = null;
@@ -49,8 +55,14 @@ export class ExportDialog {
   private captureCanvas: HTMLCanvasElement | null = null;
   private cancelled = false;
   private rendering = false;
+  private nextFrameTimer: number | null = null;
+  private renderStartedAt = 0;
 
-  constructor(openButton: HTMLButtonElement, private readonly getSource: SourceProvider) {
+  constructor(
+    openButton: HTMLButtonElement,
+    private readonly getSource: SourceProvider,
+    private readonly onComplete: (entry: ExportHistoryEntry) => void = () => undefined
+  ) {
     this.backdrop = document.createElement('div');
     this.backdrop.className = 'export-backdrop';
     this.backdrop.hidden = true;
@@ -65,8 +77,14 @@ export class ExportDialog {
           <div><strong>WebM video</strong><p class="export-summary"></p></div>
           <span>LOCAL</span>
         </div>
+        <div class="export-settings">
+          <label>Name<input class="export-name" value="loop-lab-render"></label>
+          <label>Resolution<select class="export-resolution"><option value="720">720p max</option><option value="1080">1080p max</option><option value="original">Original</option></select></label>
+          <label>Frame rate<select class="export-fps"><option value="24">24 fps</option><option value="30" selected>30 fps</option><option value="60">60 fps</option></select></label>
+        </div>
         <div class="export-parameter-header"><strong>Render parameters</strong><span>Snapshot only — your workspace stays unchanged</span></div>
         <div class="export-parameters"></div>
+        <div class="export-history"></div>
         <div class="export-progress" hidden><i></i></div>
         <p class="export-status" aria-live="polite"></p>
         <footer>
@@ -86,12 +104,18 @@ export class ExportDialog {
     this.cancelButton = this.backdrop.querySelector('.export-cancel') as HTMLButtonElement;
     this.exportButton = this.backdrop.querySelector('.export-start') as HTMLButtonElement;
     this.closeButton = this.backdrop.querySelector('.export-close') as HTMLButtonElement;
+    this.resolutionSelect = this.backdrop.querySelector('.export-resolution') as HTMLSelectElement;
+    this.fpsSelect = this.backdrop.querySelector('.export-fps') as HTMLSelectElement;
+    this.nameInput = this.backdrop.querySelector('.export-name') as HTMLInputElement;
+    this.history = this.backdrop.querySelector('.export-history') as HTMLDivElement;
 
     openButton.addEventListener('click', () => this.open());
     this.closeButton.addEventListener('click', () => this.close());
     this.cancelButton.addEventListener('click', () => this.rendering ? this.cancelRender() : this.close());
     this.randomButton.addEventListener('click', () => this.randomize());
     this.exportButton.addEventListener('click', () => void this.startExport());
+    this.resolutionSelect.addEventListener('change', () => this.updateSummary());
+    this.fpsSelect.addEventListener('change', () => this.updateSummary());
     this.backdrop.addEventListener('click', (event) => {
       if (event.target === this.backdrop && !this.rendering) this.close();
     });
@@ -104,7 +128,9 @@ export class ExportDialog {
     this.source = this.getSource();
     this.values = { ...this.source.params };
     if (this.values.duration == null) this.values.duration = 10;
+    this.nameInput.value = `loop-lab-${new Date().toISOString().slice(0, 10)}`;
     this.renderParameters();
+    this.renderHistory();
     this.updateSummary();
     this.setStatus('Ready to render on this device.');
     this.progress.hidden = true;
@@ -123,7 +149,20 @@ export class ExportDialog {
 
   private plan(): ExportPlan {
     if (!this.source) throw new Error('No export source is available.');
-    return buildExportPlan(this.source.worldWidth, this.source.worldHeight, this.values);
+    const maxSide = this.resolutionSelect.value === 'original'
+      ? Math.max(this.source.worldWidth, this.source.worldHeight)
+      : Number(this.resolutionSelect.value);
+    return buildExportPlan(this.source.worldWidth, this.source.worldHeight, this.values, maxSide, Number(this.fpsSelect.value));
+  }
+
+  private renderHistory(): void {
+    if (!this.source?.history.length) { this.history.innerHTML = ''; return; }
+    this.history.innerHTML = '<h3>RECENT EXPORTS</h3>';
+    this.source.history.slice(0, 3).forEach((entry) => {
+      const row = document.createElement('p');
+      row.innerHTML = `<strong>${entry.name}</strong><span>${entry.width}×${entry.height} · ${entry.fps} fps · ${formatFileSize(entry.bytes)}</span>`;
+      this.history.append(row);
+    });
   }
 
   private updateSummary(): void {
@@ -141,7 +180,7 @@ export class ExportDialog {
       groups.get(group)?.push([key, definition]);
     });
     if (!('duration' in this.source.schema)) {
-      groups.set('Video', [['duration', { value: 10, min: 0.25, max: 300, step: 0.25, group: 'Video' }]]);
+      groups.set('Video', [['duration', { value: 10, min: 1, max: 300, step: 0.5, group: 'Video' }]]);
     }
 
     groups.forEach((items, group) => {
@@ -223,6 +262,7 @@ export class ExportDialog {
     this.progress.hidden = false;
     this.progress.querySelector('i')?.setAttribute('style', 'width: 0%');
     this.setStatus('Preparing local renderer…');
+    this.renderStartedAt = performance.now();
 
     try {
       const canvas = document.createElement('canvas');
@@ -249,13 +289,20 @@ export class ExportDialog {
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const cleanName = this.nameInput.value.trim().replace(/[^a-z0-9-_]+/gi, '-').replace(/^-+|-+$/g, '') || `loop-lab-${timestamp}`;
         link.href = url;
-        link.download = `loop-lab-${timestamp}.webm`;
+        link.download = `${cleanName}.webm`;
         link.click();
         window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
         this.setRendering(false);
         this.progress.querySelector('i')?.setAttribute('style', 'width: 100%');
         this.setStatus(`Export complete — ${formatFileSize(blob.size)} saved.`);
+        const entry: ExportHistoryEntry = {
+          id: crypto.randomUUID(), name: `${cleanName}.webm`, createdAt: new Date().toISOString(), bytes: blob.size,
+          width: plan.width, height: plan.height, fps: plan.fps, duration: plan.duration
+        };
+        this.onComplete(entry);
+        this.renderHistory();
         this.cleanupJob();
       };
       recorder.start();
@@ -272,8 +319,10 @@ export class ExportDialog {
           track.requestFrame();
           const percent = (message.frame / message.totalFrames) * 100;
           this.progress.querySelector('i')?.setAttribute('style', `width: ${percent}%`);
-          this.setStatus(`Rendering frame ${message.frame.toLocaleString()} of ${message.totalFrames.toLocaleString()}…`);
-          window.setTimeout(() => worker.postMessage({ type: 'next' }), 1000 / plan.fps);
+          const elapsed = (performance.now() - this.renderStartedAt) / 1000;
+          const remaining = message.frame > 0 ? Math.max(0, (elapsed / message.frame) * (message.totalFrames - message.frame)) : 0;
+          this.setStatus(`Rendering frame ${message.frame.toLocaleString()} of ${message.totalFrames.toLocaleString()} · about ${Math.ceil(remaining)}s left`);
+          this.nextFrameTimer = window.setTimeout(() => worker.postMessage({ type: 'next' }), 1000 / plan.fps);
         } else if (message.type === 'complete') {
           this.setStatus('Finalizing WebM file…');
           window.setTimeout(() => { if (recorder.state !== 'inactive') recorder.stop(); }, 100);
@@ -316,6 +365,8 @@ export class ExportDialog {
   }
 
   private cleanupJob(): void {
+    if (this.nextFrameTimer != null) window.clearTimeout(this.nextFrameTimer);
+    this.nextFrameTimer = null;
     this.worker?.terminate();
     this.worker = null;
     this.stream?.getTracks().forEach((track) => track.stop());

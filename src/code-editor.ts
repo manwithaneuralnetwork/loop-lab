@@ -28,6 +28,8 @@ const editorTheme = EditorView.theme({
 
 export interface CodeEditor {
   getCode(): string;
+  setCode(code: string): void;
+  focusLine(line: number): void;
   destroy(): void;
 }
 
@@ -51,5 +53,15 @@ export function createCodeEditor(
     ],
     parent
   });
-  return { getCode: () => view.state.doc.toString(), destroy: () => view.destroy() };
+  return {
+    getCode: () => view.state.doc.toString(),
+    setCode: (code: string) => view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: code } }),
+    focusLine: (line: number) => {
+      const safeLine = Math.max(1, Math.min(line, view.state.doc.lines));
+      const position = view.state.doc.line(safeLine).from;
+      view.dispatch({ selection: { anchor: position }, effects: EditorView.scrollIntoView(position, { y: 'center' }) });
+      view.focus();
+    },
+    destroy: () => view.destroy()
+  };
 }

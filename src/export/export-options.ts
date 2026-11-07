@@ -66,7 +66,7 @@ export function buildExportPlan(
   const scale = Math.min(1, maxSide / Math.max(worldWidth, worldHeight));
   const even = (value: number) => Math.max(2, Math.round(value * scale / 2) * 2);
   const durationValue = Number(params.duration);
-  const duration = Number.isFinite(durationValue) ? Math.max(0.25, Math.min(300, durationValue)) : 10;
+  const duration = Number.isFinite(durationValue) ? Math.max(1, Math.min(300, durationValue)) : 10;
   return {
     width: even(worldWidth),
     height: even(worldHeight),
