@@ -8,6 +8,7 @@ import { RuntimeBridge } from './runtime-bridge';
 import { BOUNCING_BALLS_CODE, BOUNCING_BALLS_HELPERS } from './samples/bouncing-balls';
 import { ExportDialog } from './export/export-dialog';
 import { WorkspaceFiles } from './workspace-files';
+import { ProjectActions } from './project-actions';
 
 function query<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -15,7 +16,7 @@ function query<T extends Element>(selector: string): T {
   return element;
 }
 
-const project = loadProject(BOUNCING_BALLS_CODE, [{ path: 'helpers.js', content: BOUNCING_BALLS_HELPERS }]);
+const project = await loadProject(BOUNCING_BALLS_CODE, [{ path: 'helpers.js', content: BOUNCING_BALLS_HELPERS }]);
 const activeAtStart = project.files.find((file) => file.id === project.activeFileId && file.kind === 'code') || project.files[0];
 const editorBody = query<HTMLElement>('.editor-body');
 editorBody.innerHTML = '<div id="codeEditor" aria-label="Project code editor"></div>';
@@ -68,15 +69,15 @@ function setSaveState(saved: boolean): void {
   document.querySelector<HTMLElement>('.files .active i')?.replaceChildren(document.createTextNode(saved ? '' : '●'));
 }
 
-function persistProject(): void {
-  try { saveProject(project); setSaveState(true); }
+async function persistProject(): Promise<void> {
+  try { await saveProject(project); setSaveState(true); }
   catch { setSaveState(false); addLog('Project storage is full. Remove large imported assets before closing.', 'error'); }
 }
 
 function scheduleSave(): void {
   setSaveState(false);
   if (saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(persistProject, 450);
+  saveTimer = setTimeout(() => void persistProject(), 450);
 }
 
 const editor = createCodeEditor(query<HTMLElement>('#codeEditor'), activeAtStart.content, (code) => {
@@ -98,6 +99,7 @@ workspaceFiles = new WorkspaceFiles(project, {
   onChange: scheduleSave,
   onNotice: (message) => addLog(message)
 });
+new ProjectActions(project, workspaceFiles, { onNotice: (message) => addLog(message) });
 setSaveState(true);
 
 const runtime = new RuntimeBridge(viewport, handleRuntimeMessage, project.worldWidth, project.worldHeight);
@@ -116,7 +118,7 @@ new ExportDialog(query<HTMLButtonElement>('.export-button'), () => ({
 }), (entry) => {
   project.exportHistory.unshift(entry);
   project.exportHistory = project.exportHistory.slice(0, 12);
-  persistProject();
+  void persistProject();
 });
 
 function stamp(): string {
@@ -146,7 +148,7 @@ function setRuntimeStatus(status: 'live' | 'paused' | 'error'): void {
 function runCode(): void {
   const entry = entryFile();
   if (project.activeFileId === entry.id) entry.content = editor.getCode();
-  persistProject(); pendingCode = entry.content; logs.innerHTML = ''; errors = 0; problemCount.textContent = '0';
+  void persistProject(); pendingCode = entry.content; logs.innerHTML = ''; errors = 0; problemCount.textContent = '0';
   addLog('Compiling simulation…'); runtime.replace(); isPlaying = true; playButton.textContent = 'Ⅱ'; setRuntimeStatus('live');
 }
 
@@ -245,4 +247,4 @@ let dimensionTimer: ReturnType<typeof setTimeout> | null = null;
 function scheduleDimensionUpdate(): void { if (dimensionTimer) clearTimeout(dimensionTimer); dimensionTimer = setTimeout(updateDimensions, 250); }
 worldWidthInput.addEventListener('input', scheduleDimensionUpdate); worldHeightInput.addEventListener('input', scheduleDimensionUpdate);
 
-window.addEventListener('beforeunload', () => { persistProject(); runtime.dispose(); editor.destroy(); });
+window.addEventListener('beforeunload', () => { void persistProject(); runtime.dispose(); editor.destroy(); });

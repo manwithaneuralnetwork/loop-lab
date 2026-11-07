@@ -26,7 +26,6 @@ export class WorkspaceFiles {
     this.list = document.querySelector('.files') as HTMLElement;
     this.tabs = document.querySelector('.tabs') as HTMLElement;
     const topAdd = document.querySelector('.panel-title .add-button') as HTMLButtonElement;
-    const more = document.querySelector('.panel-title div button:last-child') as HTMLButtonElement;
     const importButton = document.querySelector('.new-file') as HTMLButtonElement;
     this.importInput = document.createElement('input');
     this.importInput.type = 'file';
@@ -34,7 +33,6 @@ export class WorkspaceFiles {
     this.importInput.hidden = true;
     document.body.append(this.importInput);
     topAdd.addEventListener('click', () => void this.createFile(''));
-    more.addEventListener('click', () => void this.createFolder());
     importButton.addEventListener('click', () => this.importInput.click());
     this.importInput.addEventListener('change', () => void this.importFiles());
     this.render();
@@ -148,7 +146,7 @@ export class WorkspaceFiles {
     this.activate(file);
   }
 
-  private async createFolder(): Promise<void> {
+  async createFolder(): Promise<void> {
     const requested = await this.requestValue('New folder', 'Folder name', 'folder');
     const folder = requested?.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
     if (!folder || this.project.folders.includes(folder)) return;

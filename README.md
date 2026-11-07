@@ -2,7 +2,7 @@
 
 Loop Lab is a browser-based creative studio for building programmable 2D games, simulations, and visual experiments.
 
-The current repository contains the approved workspace shell and the first engine vertical slice: JavaScript edited in CodeMirror runs in a disposable Web Worker, renders to an `OffscreenCanvas`, exposes code-declared parameters in the UI, and supports deterministic playback controls. Project code and parameter overrides autosave locally between sessions.
+The current repository contains the approved workspace shell and the first engine vertical slice: JavaScript edited in CodeMirror runs in a disposable Web Worker, renders to an `OffscreenCanvas`, exposes code-declared parameters in the UI, and supports deterministic playback controls. Complete projects and imported assets autosave to IndexedDB with rotating recovery checkpoints.
 
 The implementation is split into typed boundaries:
 
@@ -17,9 +17,13 @@ The workspace now persists multiple code files, folders, imported assets, open t
 
 ## Rendering and physics roadmap
 
-Loop Lab currently uses its own small Canvas 2D renderer. **PixiJS is not integrated yet.** Now that the engine-facing sprite and text APIs exist, we can evaluate PixiJS as a backend replacement without coupling project code directly to it.
+Loop Lab currently uses its own small Canvas 2D renderer. **PixiJS is not planned as a default dependency.** The present renderer matches the intended project scale; PixiJS will only be reconsidered if real profiling shows that sprite count, filters, or batching have become a concrete limitation.
 
 **Matter.js is not currently installed.** It is on the evaluation list as an optional rigid-body physics backend, not a default dependency. The present lightweight body and boundary helpers are sufficient for simple simulations. Matter.js should be added when we commit to rotation, constraints, compound bodies, and robust collision solving, ideally behind an opt-in `@loop/physics` adapter.
+
+## Project durability
+
+Projects are saved in IndexedDB rather than browser key/value storage, allowing substantially larger imported assets. Autosave keeps up to ten rotating recovery checkpoints, and users can create explicit checkpoints from the Explorer menu. Complete projects can be downloaded and reopened as readable, versioned `.looplab` JSON packages. See [`docs/project-packages.md`](docs/project-packages.md).
 
 ## Local development
 

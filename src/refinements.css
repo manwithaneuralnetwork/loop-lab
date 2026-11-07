@@ -157,6 +157,29 @@
 .file-dialog footer .primary { border-color: var(--orange); background: var(--orange); color: #21130d; font-weight: 700; }
 .file-dialog footer .danger { border-color: #7a3b32; background: #472621; color: #ffb09c; }
 
+/* Durable projects and recovery */
+.project-menu[hidden] { display: none; }
+.project-menu { position: absolute; top: 31px; right: 7px; z-index: 80; width: 170px; padding: 5px; border: 1px solid #3c4046; border-radius: 5px; background: #202226; box-shadow: 0 14px 36px #000b; }
+.project-menu button { width: 100%; height: 29px; display: grid; grid-template-columns: 22px 1fr; align-items: center; padding: 0 7px; border-radius: 3px; color: #b0b4ba; font-size: 9px; text-align: left; }
+.project-menu button:hover { background: #2d3035; color: white; }
+.project-menu button span { color: #ff8b58; font: 10px "DM Mono"; }
+.project-menu > i { display: block; height: 1px; margin: 4px 3px; background: #35383e; }
+.recovery-dialog { width: min(560px,calc(100vw - 32px)); max-height: min(640px,calc(100vh - 40px)); padding: 0; overflow: hidden; border: 1px solid #41454b; border-radius: 8px; background: #1b1d20; color: #eee; box-shadow: 0 28px 90px #000c; }
+.recovery-dialog::backdrop { background: #070809bb; backdrop-filter: blur(4px); }
+.recovery-dialog > header { display: flex; align-items: center; justify-content: space-between; padding: 15px 17px; border-bottom: 1px solid #303339; background: #1f2124; }
+.recovery-dialog header span { color: var(--orange); font: 7px "DM Mono"; letter-spacing: .12em; }
+.recovery-dialog h2 { margin: 3px 0 0; font-size: 16px; }
+.recovery-dialog header button { width: 30px; height: 30px; border-radius: 4px; color: #888d94; font-size: 18px; }
+.recovery-dialog header button:hover { background: #2a2d31; color: white; }
+.recovery-list { max-height: 500px; overflow: auto; padding: 8px; }
+.recovery-list article { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px; min-height: 54px; padding: 8px 9px; border-bottom: 1px solid #2d3035; }
+.recovery-list article:last-child { border-bottom: 0; }
+.recovery-list strong { display: block; color: #d4d3cf; font-size: 10px; font-weight: 600; }
+.recovery-list span { display: block; margin-top: 4px; color: #747a82; font: 8px "DM Mono"; text-transform: capitalize; }
+.recovery-list article button { height: 28px; padding: 0 10px; border: 1px solid #3c4046; border-radius: 4px; background: #25282c; color: #b0b4ba; font-size: 9px; }
+.recovery-list article button:hover { border-color: #ff6b2c77; color: white; }
+.recovery-list .empty { padding: 30px 18px; color: #7e838a; font-size: 10px; text-align: center; }
+
 /* Project files and editor tabs */
 .files { padding-top: 4px; }
 .file-row { min-height: 27px; display: grid; grid-template-columns: minmax(0,1fr) 22px 22px; align-items: center; color: #9da1a8; }
