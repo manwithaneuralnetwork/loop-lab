@@ -11,6 +11,8 @@ const SAMPLE_CODE = `// Loop Lab — Bouncing Balls
 export const parameters = {
   seed:        { value: 42, min: 1, max: 999, step: 1, group: "Simulation" },
   count:       { value: 14, min: 1, max: 50, step: 1, group: "Simulation" },
+  duration:    { value: 20, min: 1, max: 120, step: 1, group: "Simulation" },
+  autoRestart: { value: true, group: "Simulation" },
   gravity:     { value: 520, min: 0, max: 1200, step: 10, group: "Physics" },
   restitution: { value: 0.88, min: 0.2, max: 1, step: 0.01, group: "Physics" },
   speed:       { value: 1, min: 0.25, max: 2, step: 0.05, group: "Physics" },
@@ -162,7 +164,11 @@ function render() {
 
 function tick() {
   if (!playing) return;
-  simulateStep(); render();
+  simulateStep();
+  if (Number(params.duration) > 0 && elapsed >= Number(params.duration)) {
+    if (params.autoRestart !== false) reset();
+    else { playing = false; send("status", { playing }); render(); }
+  } else render();
   if (frame % 6 === 0) send("time", { elapsed, frame, objectCount: world.objects.length });
 }
 
@@ -387,8 +393,10 @@ window.addEventListener('message', event => {
   if (message.type === 'log') addLog(message.message, message.level);
   if (message.type === 'error') { addLog(message.message, 'error'); playButton.textContent = '▶'; isPlaying = false; }
   if (message.type === 'time') {
-    const current = message.elapsed || 0; const total = 20; const percent = Math.min(100, current / total * 100);
-    timeReadout.innerHTML = `<b>${formatTime(current)}</b> / ${formatTime(total)}`;
+    const current = message.elapsed || 0;
+    const total = Number(currentParams.duration) || 0;
+    const percent = total ? Math.min(100, current / total * 100) : 0;
+    timeReadout.innerHTML = total ? `<b>${formatTime(current)}</b> / ${formatTime(total)}` : `<b>${formatTime(current)}</b>`;
     progressBar.style.width = `${percent}%`; playhead.style.left = `${percent}%`;
   }
 });
