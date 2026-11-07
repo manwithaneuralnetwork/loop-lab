@@ -25,4 +25,23 @@ describe('World', () => {
     expect(world.bounds).toEqual({ left: 0, top: 0, right: 320, bottom: 180 });
     expect(world.objects).toHaveLength(1);
   });
+
+  it('creates sprites and text while resolving project assets', () => {
+    const world = new World(100, 100, 1, { 'assets/star.png': 'data:image/png;base64,abc' });
+    const sprite = world.sprite({ asset: 'assets/star.png', width: 24, height: 24 });
+    const label = world.text({ text: 'Score', fontSize: 18 });
+    expect(sprite.asset).toBe('data:image/png;base64,abc');
+    expect(label.text).toBe('Score');
+    expect(() => world.asset('assets/missing.png')).toThrow(/Asset not found/);
+  });
+
+  it('tracks pointer and keyboard input', () => {
+    const world = new World(100, 100);
+    world.updateInput({ x: 20, y: 30, down: true });
+    world.updateInput(undefined, 'ArrowLeft', true);
+    expect(world.input.pointer).toEqual({ x: 20, y: 30, down: true });
+    expect(world.input.keys.has('ArrowLeft')).toBe(true);
+    world.updateInput(undefined, 'ArrowLeft', false);
+    expect(world.input.keys.has('ArrowLeft')).toBe(false);
+  });
 });

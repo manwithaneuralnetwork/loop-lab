@@ -15,11 +15,13 @@ function send(message: RuntimeToHostMessage): void { workerScope.postMessage(mes
 function fail(error: unknown): void {
   playing = false;
   const value = error instanceof Error ? error : new Error(String(error));
-  const sourceLocation = value.stack?.match(/<anonymous>:(\d+):(\d+)/);
+  const projectLocation = value.stack?.match(/loop:\/\/\/([^:\n]+):(\d+):(\d+)/);
+  const sourceLocation = projectLocation || value.stack?.match(/<anonymous>:(\d+):(\d+)/);
   send({
     type: 'error', message: value.message, stack: value.stack,
-    line: sourceLocation ? Math.max(1, Number(sourceLocation[1]) - 3) : undefined,
-    column: sourceLocation ? Number(sourceLocation[2]) : undefined
+    file: projectLocation?.[1],
+    line: sourceLocation ? Math.max(1, Number(sourceLocation[projectLocation ? 2 : 1]) - 3) : undefined,
+    column: sourceLocation ? Number(sourceLocation[projectLocation ? 3 : 2]) : undefined
   });
   send({ type: 'status', playing: false });
 }
@@ -67,7 +69,8 @@ workerScope.onmessage = (event: MessageEvent<HostToRuntimeMessage>) => {
       timer = setInterval(tick, 1000 / 60);
       send({ type: 'ready' });
     } else if (message.type === 'run') {
-      runtime.load(message.code, message.params);
+      if (message.files) runtime.loadProject(message.files, message.entry || 'simulation.js', message.params, message.assets);
+      else runtime.load(message.code, message.params);
       playing = true;
       renderer?.render(runtime.world);
       reportLoaded();
@@ -83,6 +86,8 @@ workerScope.onmessage = (event: MessageEvent<HostToRuntimeMessage>) => {
       renderer?.render(runtime.world);
       send({ type: 'status', playing: false });
       send({ type: 'time', elapsed: runtime.elapsed, frame: runtime.frame, objectCount: runtime.world.objects.length });
+    } else if (message.type === 'input') {
+      runtime.world.updateInput(message.pointer, message.key, message.pressed);
     } else if (message.type === 'step') {
       playing = false;
       runtime.step();

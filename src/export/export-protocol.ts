@@ -4,6 +4,9 @@ export type ExportWorkerRequest =
   | {
       type: 'start';
       code: string;
+      files?: Record<string, string>;
+      assets?: Record<string, string>;
+      entry?: string;
       params: ParameterValues;
       worldWidth: number;
       worldHeight: number;

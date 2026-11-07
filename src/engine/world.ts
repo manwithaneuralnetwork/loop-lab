@@ -13,10 +13,22 @@ export interface BodyOptions {
   bounce?: boolean;
   restitution?: number;
   trail?: number;
+  asset?: string;
+  text?: string;
+  font?: string;
+  fontSize?: number;
+  align?: CanvasTextAlign;
+  rotation?: number;
+  opacity?: number;
+}
+
+export interface WorldInput {
+  pointer: { x: number; y: number; down: boolean };
+  keys: Set<string>;
 }
 
 export class Body {
-  readonly kind: 'circle' | 'rectangle';
+  readonly kind: 'circle' | 'rectangle' | 'sprite' | 'text';
   position: Point;
   velocity: Point;
   radius: number;
@@ -27,8 +39,15 @@ export class Body {
   restitution: number;
   trailLength: number;
   trail: Point[] = [];
+  asset: string;
+  text: string;
+  font: string;
+  fontSize: number;
+  align: CanvasTextAlign;
+  rotation: number;
+  opacity: number;
 
-  constructor(kind: 'circle' | 'rectangle', options: BodyOptions = {}) {
+  constructor(kind: 'circle' | 'rectangle' | 'sprite' | 'text', options: BodyOptions = {}) {
     this.kind = kind;
     this.position = { x: Number(options.x) || 0, y: Number(options.y) || 0 };
     this.velocity = { x: Number(options.vx) || 0, y: Number(options.vy) || 0 };
@@ -39,6 +58,13 @@ export class Body {
     this.bounce = Boolean(options.bounce);
     this.restitution = Number(options.restitution ?? 0.88);
     this.trailLength = Number(options.trail) || 0;
+    this.asset = options.asset || '';
+    this.text = options.text || '';
+    this.font = options.font || 'Manrope, sans-serif';
+    this.fontSize = Number(options.fontSize) || 24;
+    this.align = options.align || 'center';
+    this.rotation = Number(options.rotation) || 0;
+    this.opacity = Number(options.opacity ?? 1);
   }
 
   bounceInside(bounds: Bounds, restitution = this.restitution): void {
@@ -80,13 +106,16 @@ export class World {
   width: number;
   height: number;
   bounds: Bounds;
+  readonly input: WorldInput = { pointer: { x: 0, y: 0, down: false }, keys: new Set() };
   private randomSource: () => number;
+  private readonly assets: Record<string, string>;
 
-  constructor(width: number, height: number, seed = 1) {
+  constructor(width: number, height: number, seed = 1, assets: Record<string, string> = {}) {
     this.width = width;
     this.height = height;
     this.bounds = { left: 0, top: 0, right: width, bottom: height };
     this.randomSource = makeRandom(seed);
+    this.assets = assets;
   }
 
   random(min = 0, max = 1): number {
@@ -103,6 +132,29 @@ export class World {
     const body = new Body('rectangle', options);
     this.objects.push(body);
     return body;
+  }
+
+  sprite(options: BodyOptions & { asset: string }): Body {
+    const body = new Body('sprite', { ...options, asset: this.assets[options.asset] || options.asset });
+    this.objects.push(body);
+    return body;
+  }
+
+  text(options: BodyOptions & { text: string }): Body {
+    const body = new Body('text', options);
+    this.objects.push(body);
+    return body;
+  }
+
+  asset(path: string): string {
+    const value = this.assets[path];
+    if (!value) throw new Error(`Asset not found: ${path}`);
+    return value;
+  }
+
+  updateInput(pointer?: Partial<WorldInput['pointer']>, key?: string, pressed?: boolean): void {
+    if (pointer) Object.assign(this.input.pointer, pointer);
+    if (key) { if (pressed) this.input.keys.add(key); else this.input.keys.delete(key); }
   }
 
   clear(): void { this.objects.length = 0; }

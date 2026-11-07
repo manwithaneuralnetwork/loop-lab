@@ -6,6 +6,9 @@ import type { ExportHistoryEntry } from '../project-store';
 
 export interface ExportSource {
   code: string;
+  files: Record<string, string>;
+  assets: Record<string, string>;
+  entry: string;
   schema: ParameterSchema;
   params: ParameterValues;
   worldWidth: number;
@@ -331,6 +334,9 @@ export class ExportDialog {
       worker.postMessage({
         type: 'start',
         code: this.source.code,
+        files: this.source.files,
+        assets: this.source.assets,
+        entry: this.source.entry,
         params: this.values,
         worldWidth: this.source.worldWidth,
         worldHeight: this.source.worldHeight,

@@ -14,11 +14,12 @@ export type ParameterValues = Record<string, ParameterValue>;
 
 export type HostToRuntimeMessage =
   | { type: 'init'; canvas: OffscreenCanvas; width: number; height: number }
-  | { type: 'run'; code: string; params: ParameterValues }
+  | { type: 'run'; code: string; params: ParameterValues; files?: Record<string, string>; assets?: Record<string, string>; entry?: string }
   | { type: 'restart' }
   | { type: 'play'; playing: boolean }
   | { type: 'speed'; rate: number }
   | { type: 'seek'; seconds: number }
+  | { type: 'input'; pointer?: { x?: number; y?: number; down?: boolean }; key?: string; pressed?: boolean }
   | { type: 'step' }
   | { type: 'params'; params: ParameterValues }
   | { type: 'resize'; width: number; height: number };
@@ -27,6 +28,6 @@ export type RuntimeToHostMessage =
   | { type: 'ready' }
   | { type: 'parameters'; schema: ParameterSchema; params: ParameterValues }
   | { type: 'log'; level: 'ok' | 'info'; message: string }
-  | { type: 'error'; message: string; stack?: string; line?: number; column?: number }
+  | { type: 'error'; message: string; stack?: string; file?: string; line?: number; column?: number }
   | { type: 'status'; playing: boolean }
   | { type: 'time'; elapsed: number; frame: number; objectCount: number };

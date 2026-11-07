@@ -35,14 +35,15 @@ scope.onmessage = (event: MessageEvent<ExportWorkerRequest>) => {
     const message = event.data;
     if (message.type === 'start') {
       runtime = new SimulationRuntime(message.worldWidth, message.worldHeight);
-      runtime.load(message.code, message.params);
+      if (message.files) runtime.loadProject(message.files, message.entry || 'simulation.js', message.params, message.assets);
+      else runtime.load(message.code, message.params);
       canvas = new OffscreenCanvas(message.outputWidth, message.outputHeight);
       renderer = new CanvasRenderer(canvas);
       renderer.resize(message.outputWidth, message.outputHeight);
       frame = 0;
       totalFrames = message.totalFrames;
       stepsPerFrame = Math.max(1, Math.round((1 / message.fps) / runtime.stepSize));
-      sendFrame();
+      void renderer.preload(runtime.world).then(sendFrame).catch((error) => send({ type: 'error', message: error instanceof Error ? error.message : String(error) }));
     } else if (message.type === 'next') sendFrame();
   } catch (error) {
     send({ type: 'error', message: error instanceof Error ? error.message : String(error) });

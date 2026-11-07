@@ -1,25 +1,14 @@
 import { normalizeParameters } from './parameters';
 import type { ParameterSchema, ParameterValues } from './protocol';
 import { World } from './world';
-
-interface SimulationHooks {
-  parameters: ParameterSchema;
-  setup: ((world: World, params: ParameterValues) => void) | null;
-  update: ((world: World, dt: number, params: ParameterValues) => void) | null;
-}
+import { compileProject, type ProjectSources, type SimulationHooks } from './module-runtime';
 
 export function compileSimulation(
   source: string,
   world: World,
   params: ParameterValues
 ): SimulationHooks {
-  const transformed = source.replace(/\bexport\s+(?=(const|let|var|function|class)\b)/g, '');
-  const factory = new Function(
-    'world',
-    'params',
-    `"use strict";\n${transformed}\nreturn { parameters: typeof parameters !== "undefined" ? parameters : {}, setup: typeof setup === "function" ? setup : null, update: typeof update === "function" ? update : null };`
-  ) as (world: World, params: ParameterValues) => SimulationHooks;
-  return factory(world, params);
+  return compileProject({ 'simulation.js': source }, 'simulation.js', world, params);
 }
 
 export class SimulationRuntime {
@@ -32,6 +21,9 @@ export class SimulationRuntime {
   private width: number;
   private height: number;
   private source = '';
+  private sources: ProjectSources = {};
+  private entry = 'simulation.js';
+  private assets: Record<string, string> = {};
   private hooks: SimulationHooks = { parameters: {}, setup: null, update: null };
 
   constructor(width: number, height: number, stepSize = 1 / 60) {
@@ -42,19 +34,26 @@ export class SimulationRuntime {
   }
 
   load(source: string, overrides: ParameterValues = {}): void {
-    this.source = source;
-    const discoveryWorld = new World(this.width, this.height);
-    const discovered = compileSimulation(source, discoveryWorld, {});
+    this.loadProject({ 'simulation.js': source }, 'simulation.js', overrides);
+  }
+
+  loadProject(sources: ProjectSources, entry = 'simulation.js', overrides: ParameterValues = {}, assets: Record<string, string> = {}): void {
+    this.source = sources[entry] || '';
+    this.sources = { ...sources };
+    this.entry = entry;
+    this.assets = { ...assets };
+    const discoveryWorld = new World(this.width, this.height, 1, this.assets);
+    const discovered = compileProject(this.sources, this.entry, discoveryWorld, {});
     this.schema = discovered.parameters || {};
     this.params = normalizeParameters(this.schema, overrides);
     this.elapsed = 0;
     this.frame = 0;
-    this.world = new World(this.width, this.height, Number(this.params.seed) || 1);
-    this.hooks = compileSimulation(source, this.world, this.params);
+    this.world = new World(this.width, this.height, Number(this.params.seed) || 1, this.assets);
+    this.hooks = compileProject(this.sources, this.entry, this.world, this.params);
     this.hooks.setup?.(this.world, this.params);
   }
 
-  restart(): void { this.load(this.source, this.params); }
+  restart(): void { this.loadProject(this.sources, this.entry, this.params, this.assets); }
 
   updateParameters(values: ParameterValues): void {
     this.params = { ...this.params, ...values };

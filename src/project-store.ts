@@ -55,18 +55,18 @@ export function uniquePath(files: ProjectFile[], requestedPath: string): string 
   return `${directory}${stem}-${index}${extension}`;
 }
 
-function fallbackProject(fallbackCode: string): ProjectState {
+function fallbackProject(fallbackCode: string, additionalFiles: Array<{ path: string; content: string }> = []): ProjectState {
   const file = createProjectFile('simulation.js', fallbackCode);
   return {
-    files: [file], folders: ['assets'], activeFileId: file.id, openFileIds: [file.id], parameterValues: {},
+    files: [file, ...additionalFiles.map((item) => createProjectFile(item.path, item.content))], folders: ['assets'], activeFileId: file.id, openFileIds: [file.id], parameterValues: {},
     gridVisible: true, worldWidth: 1080, worldHeight: 1080, exportHistory: []
   };
 }
 
-export function loadProject(fallbackCode: string): ProjectState {
+export function loadProject(fallbackCode: string, additionalFiles: Array<{ path: string; content: string }> = []): ProjectState {
   try {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') as LegacyProjectState | null;
-    if (!stored) return fallbackProject(fallbackCode);
+    if (!stored) return fallbackProject(fallbackCode, additionalFiles);
     const migrated = stored.files?.length ? stored.files : [createProjectFile('simulation.js', stored.code || fallbackCode)];
     const activeFileId = migrated.some((file) => file.id === stored.activeFileId) ? stored.activeFileId! : migrated[0].id;
     const openFileIds = (stored.openFileIds || [activeFileId]).filter((id) => migrated.some((file) => file.id === id));
@@ -82,7 +82,7 @@ export function loadProject(fallbackCode: string): ProjectState {
       exportHistory: stored.exportHistory || []
     };
   } catch {
-    return fallbackProject(fallbackCode);
+    return fallbackProject(fallbackCode, additionalFiles);
   }
 }
 

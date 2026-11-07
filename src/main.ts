@@ -5,7 +5,7 @@ import type { ParameterDefinition, ParameterSchema, ParameterValue, ParameterVal
 import { isParameterDefinition } from './engine/parameters';
 import { loadProject, saveProject, type ProjectFile } from './project-store';
 import { RuntimeBridge } from './runtime-bridge';
-import { BOUNCING_BALLS_CODE } from './samples/bouncing-balls';
+import { BOUNCING_BALLS_CODE, BOUNCING_BALLS_HELPERS } from './samples/bouncing-balls';
 import { ExportDialog } from './export/export-dialog';
 import { WorkspaceFiles } from './workspace-files';
 
@@ -15,7 +15,7 @@ function query<T extends Element>(selector: string): T {
   return element;
 }
 
-const project = loadProject(BOUNCING_BALLS_CODE);
+const project = loadProject(BOUNCING_BALLS_CODE, [{ path: 'helpers.js', content: BOUNCING_BALLS_HELPERS }]);
 const activeAtStart = project.files.find((file) => file.id === project.activeFileId && file.kind === 'code') || project.files[0];
 const editorBody = query<HTMLElement>('.editor-body');
 editorBody.innerHTML = '<div id="codeEditor" aria-label="Project code editor"></div>';
@@ -51,6 +51,14 @@ let errors = 0;
 
 function entryFile(): ProjectFile {
   return project.files.find((file) => file.path === 'simulation.js') || project.files.find((file) => file.kind === 'code')!;
+}
+
+function projectSources(): Record<string, string> {
+  return Object.fromEntries(project.files.filter((file) => file.kind === 'code' && /\.(?:js|ts)$/.test(file.path)).map((file) => [file.path, file.content]));
+}
+
+function projectAssets(): Record<string, string> {
+  return Object.fromEntries(project.files.filter((file) => file.kind === 'asset').map((file) => [file.path, file.content]));
 }
 
 function setSaveState(saved: boolean): void {
@@ -97,6 +105,9 @@ runtime.start();
 
 new ExportDialog(query<HTMLButtonElement>('.export-button'), () => ({
   code: entryFile().content,
+  files: projectSources(),
+  assets: projectAssets(),
+  entry: entryFile().path,
   schema: currentSchema,
   params: { ...currentParams },
   worldWidth: project.worldWidth,
@@ -116,13 +127,13 @@ function escapeHTML(value: unknown): string {
   const node = document.createElement('div'); node.textContent = String(value); return node.innerHTML;
 }
 
-function addLog(message: string, level: 'info' | 'ok' | 'error' = 'info', line?: number, column?: number): void {
+function addLog(message: string, level: 'info' | 'ok' | 'error' = 'info', line?: number, column?: number, file = 'simulation.js'): void {
   const row = document.createElement(line ? 'button' : 'p');
   const icon = level === 'error' ? '×' : level === 'ok' ? '●' : '›';
-  row.innerHTML = `<time>${stamp()}</time><span class="${level}">${icon}</span> ${escapeHTML(message)}${line ? `<em>simulation.js:${line}${column ? `:${column}` : ''}</em>` : ''}`;
+  row.innerHTML = `<time>${stamp()}</time><span class="${level}">${icon}</span> ${escapeHTML(message)}${line ? `<em>${escapeHTML(file)}:${line}${column ? `:${column}` : ''}</em>` : ''}`;
   if (line) {
     row.className = 'source-log';
-    row.addEventListener('click', () => { workspaceFiles.openFile(entryFile().id); editor.focusLine(line); });
+    row.addEventListener('click', () => { const source = project.files.find((candidate) => candidate.path === file) || entryFile(); workspaceFiles.openFile(source.id); editor.focusLine(line); });
   }
   logs.append(row); logs.scrollTop = logs.scrollHeight;
 }
@@ -171,12 +182,12 @@ function renderParameters(schema: ParameterSchema, values: ParameterValues): voi
 
 function handleRuntimeMessage(message: RuntimeToHostMessage): void {
   if (message.type === 'ready') {
-    if (pendingCode !== null) { runtime.post({ type: 'run', code: pendingCode, params: project.parameterValues }); pendingCode = null; initialRunComplete = true; }
-    else if (!initialRunComplete) { logs.innerHTML = ''; addLog('Compiling simulation…'); runtime.post({ type: 'run', code: entryFile().content, params: project.parameterValues }); initialRunComplete = true; }
+    if (pendingCode !== null) { runtime.post({ type: 'run', code: pendingCode, files: projectSources(), assets: projectAssets(), entry: entryFile().path, params: project.parameterValues }); pendingCode = null; initialRunComplete = true; }
+    else if (!initialRunComplete) { logs.innerHTML = ''; addLog('Compiling simulation…'); runtime.post({ type: 'run', code: entryFile().content, files: projectSources(), assets: projectAssets(), entry: entryFile().path, params: project.parameterValues }); initialRunComplete = true; }
   } else if (message.type === 'parameters') renderParameters(message.schema, message.params);
   else if (message.type === 'log') addLog(message.message, message.level);
   else if (message.type === 'error') {
-    errors += 1; problemCount.textContent = String(errors); addLog(message.message, 'error', message.line, message.column);
+    errors += 1; problemCount.textContent = String(errors); addLog(message.message, 'error', message.line, message.column, message.file);
     playButton.textContent = '▶'; isPlaying = false; setRuntimeStatus('error');
   } else if (message.type === 'status') {
     isPlaying = message.playing; playButton.textContent = isPlaying ? 'Ⅱ' : '▶'; if (!liveStatus.classList.contains('error')) setRuntimeStatus(isPlaying ? 'live' : 'paused');

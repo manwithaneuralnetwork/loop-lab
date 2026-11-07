@@ -4,6 +4,30 @@ export class CanvasRenderer {
   private readonly context: OffscreenCanvasRenderingContext2D;
   private pixelWidth = 1;
   private pixelHeight = 1;
+  private readonly images = new Map<string, ImageBitmap | Promise<ImageBitmap>>();
+
+  private loadImage(source: string): Promise<ImageBitmap> {
+    const cached = this.images.get(source);
+    if (cached instanceof ImageBitmap) return Promise.resolve(cached);
+    if (cached) return cached;
+    const loading = fetch(source).then((response) => response.blob()).then((blob) => createImageBitmap(blob));
+    this.images.set(source, loading);
+    void loading.then((bitmap) => this.images.set(source, bitmap)).catch(() => this.images.delete(source));
+    return loading;
+  }
+
+  private image(source: string): ImageBitmap | null {
+    if (!source) return null;
+    const cached = this.images.get(source);
+    if (cached instanceof ImageBitmap) return cached;
+    if (!cached) void this.loadImage(source);
+    return null;
+  }
+
+  async preload(world: World): Promise<void> {
+    const sources = [...new Set(world.objects.filter((body) => body.kind === 'sprite' && body.asset).map((body) => body.asset))];
+    await Promise.all(sources.map((source) => this.loadImage(source)));
+  }
 
   constructor(private readonly canvas: OffscreenCanvas) {
     const context = canvas.getContext('2d');
@@ -39,18 +63,28 @@ export class CanvasRenderer {
       ctx.shadowColor = body.color;
       ctx.shadowBlur = 13;
       ctx.fillStyle = body.color;
+      ctx.save();
+      ctx.translate(body.position.x, body.position.y);
+      ctx.rotate(body.rotation);
+      ctx.globalAlpha = body.opacity;
       if (body.kind === 'circle') {
         ctx.beginPath();
-        ctx.arc(body.position.x, body.position.y, body.radius, 0, Math.PI * 2);
+        ctx.arc(0, 0, body.radius, 0, Math.PI * 2);
         ctx.fill();
-      } else {
-        ctx.fillRect(
-          body.position.x - body.width / 2,
-          body.position.y - body.height / 2,
-          body.width,
-          body.height
-        );
+      } else if (body.kind === 'rectangle') {
+        ctx.fillRect(-body.width / 2, -body.height / 2, body.width, body.height);
+      } else if (body.kind === 'sprite') {
+        ctx.shadowBlur = 0;
+        const bitmap = this.image(body.asset);
+        if (bitmap) ctx.drawImage(bitmap, -body.width / 2, -body.height / 2, body.width, body.height);
+        else { ctx.globalAlpha *= .2; ctx.fillRect(-body.width / 2, -body.height / 2, body.width, body.height); }
+      } else if (body.kind === 'text') {
+        ctx.font = `${body.fontSize}px ${body.font}`;
+        ctx.textAlign = body.align;
+        ctx.textBaseline = 'middle';
+        ctx.fillText(body.text, 0, 0);
       }
+      ctx.restore();
     }
     ctx.shadowBlur = 0;
     ctx.globalAlpha = 1;

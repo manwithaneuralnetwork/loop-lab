@@ -13,11 +13,11 @@ The implementation is split into typed boundaries:
 
 Video export is local-only in this version. The export dialog snapshots the current code and parameter values, supports per-export overrides and randomized creative parameters, and renders deterministic WebM video in a separate worker. Output can use 24, 30, or 60 fps with 720p, 1080p, or original-size bounds; no project or cloud data is involved.
 
-The workspace now persists multiple code files, folders, imported assets, open tabs, and export history. `simulation.js` is the protected runtime entry file; cross-file JavaScript imports are intentionally deferred until a project bundler is introduced. Preview controls support deterministic seeking, 0.25×–4× playback, stepping, runtime status, and fullscreen presentation. WebM exports offer naming, 720p/1080p/original bounds, 24/30/60 fps, progress/ETA, and cancellation.
+The workspace now persists multiple code files, folders, imported assets, open tabs, and export history. `simulation.js` is the protected runtime entry file, and relative modules can import one another with standard JavaScript syntax. Preview controls support deterministic seeking, 0.25×–4× playback, stepping, pointer/keyboard input, runtime status, and fullscreen presentation. The engine now renders circles, rectangles, text, and imported-image sprites. WebM exports offer naming, 720p/1080p/original bounds, 24/30/60 fps, asset preloading, progress/ETA, and cancellation. See [`docs/runtime-api.md`](docs/runtime-api.md) for the programming model.
 
 ## Rendering and physics roadmap
 
-Loop Lab currently uses its own small Canvas 2D renderer. **PixiJS is not integrated yet.** Before adding image/sprite APIs, we will evaluate adopting PixiJS as the rendering backend; the engine-facing API should remain Loop Lab’s so projects are not coupled directly to PixiJS.
+Loop Lab currently uses its own small Canvas 2D renderer. **PixiJS is not integrated yet.** Now that the engine-facing sprite and text APIs exist, we can evaluate PixiJS as a backend replacement without coupling project code directly to it.
 
 **Matter.js is not currently installed.** It is on the evaluation list as an optional rigid-body physics backend, not a default dependency. The present lightweight body and boundary helpers are sufficient for simple simulations. Matter.js should be added when we commit to rotation, constraints, compound bodies, and robust collision solving, ideally behind an opt-in `@loop/physics` adapter.
 
