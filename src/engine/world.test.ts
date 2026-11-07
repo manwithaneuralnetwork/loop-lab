@@ -42,6 +42,36 @@ describe('World', () => {
     expect(world.objects).toEqual([first]);
   });
 
+  it('resolves circle collisions and exposes contact events', () => {
+    const world = new World(100, 100);
+    const first = world.circle({ x: 40, y: 50, vx: 10, radius: 10, restitution: 1 });
+    const second = world.circle({ x: 55, y: 50, vx: -10, radius: 10, restitution: 1 });
+    world.advance(0);
+    expect(first.velocity.x).toBeCloseTo(-10);
+    expect(second.velocity.x).toBeCloseTo(10);
+    expect(first.touches(second)).toBe(true);
+    expect(second.touches(first.id)).toBe(true);
+  });
+
+  it('resolves circles against static rectangles', () => {
+    const world = new World(100, 100);
+    const ball = world.circle({ x: 44, y: 50, vx: 20, radius: 10, restitution: 0.5 });
+    const wall = world.rectangle({ x: 55, y: 50, width: 10, height: 40, static: true, restitution: 0.5 });
+    world.advance(0);
+    expect(ball.velocity.x).toBeCloseTo(-10);
+    expect(wall.position.x).toBe(55);
+    expect(ball.touches(wall)).toBe(true);
+  });
+
+  it('allows decorative objects to opt out of collisions', () => {
+    const world = new World(100, 100);
+    const first = world.circle({ x: 40, y: 50, vx: 10, radius: 10, collidable: false });
+    const second = world.circle({ x: 55, y: 50, vx: -10, radius: 10 });
+    world.advance(0);
+    expect(first.velocity.x).toBe(10);
+    expect(second.velocity.x).toBe(-10);
+  });
+
   it('maps pointer coordinates through the camera', () => {
     const world = new World(200, 100);
     world.camera.zoom = 2;

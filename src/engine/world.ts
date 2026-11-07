@@ -35,6 +35,9 @@ export interface BodyOptions {
   visible?: boolean;
   active?: boolean;
   tags?: string[];
+  collidable?: boolean;
+  static?: boolean;
+  mass?: number;
 }
 
 export interface WorldInput {
@@ -69,6 +72,10 @@ export class Body {
   destroyed = false;
   readonly tags: Set<string>;
   readonly collisions = new Set<BoundarySide>();
+  readonly contacts = new Set<string>();
+  collidable: boolean;
+  static: boolean;
+  mass: number;
 
   constructor(id: string, kind: 'circle' | 'rectangle' | 'sprite' | 'text', options: BodyOptions = {}) {
     this.id = id;
@@ -94,6 +101,10 @@ export class Body {
     this.visible = options.visible ?? true;
     this.active = options.active ?? true;
     this.tags = new Set(options.tags || []);
+    this.collidable = options.collidable ?? (kind === 'circle' || kind === 'rectangle');
+    this.static = Boolean(options.static);
+    const area = kind === 'circle' ? Math.PI * this.radius * this.radius : this.width * this.height;
+    this.mass = Math.max(0.0001, Number(options.mass) || area);
   }
 
   bounceInside(bounds: Bounds, restitution = this.restitution): BoundarySide[] {
@@ -126,6 +137,7 @@ export class Body {
 
   hit(side: BoundarySide): boolean { return this.collisions.has(side); }
   hasTag(tag: string): boolean { return this.tags.has(tag); }
+  touches(body: Body | string): boolean { return this.contacts.has(typeof body === 'string' ? body : body.id); }
   destroy(): void { this.destroyed = true; }
 }
 
@@ -166,6 +178,7 @@ export class World {
   height: number;
   bounds: Bounds;
   readonly camera: Camera;
+  collisionIterations = 2;
   readonly input: WorldInput = { pointer: { x: 0, y: 0, down: false }, keys: new Set() };
   private randomSource: () => number;
   private readonly assets: Record<string, string>;
@@ -277,6 +290,84 @@ export class World {
     return { left: body.position.x - rx, top: body.position.y - ry, right: body.position.x + rx, bottom: body.position.y + ry };
   }
 
+  private collisionContact(first: Body, second: Body): { x: number; y: number; penetration: number } | null {
+    if (first.kind === 'circle' && second.kind === 'circle') {
+      const dx = second.position.x - first.position.x;
+      const dy = second.position.y - first.position.y;
+      const minimum = first.radius + second.radius;
+      const distance = Math.hypot(dx, dy);
+      if (distance >= minimum) return null;
+      return distance > 0
+        ? { x: dx / distance, y: dy / distance, penetration: minimum - distance }
+        : { x: 1, y: 0, penetration: minimum };
+    }
+    if (first.kind !== 'circle' && second.kind !== 'circle') {
+      const a = this.bodyBounds(first); const b = this.bodyBounds(second);
+      const overlapX = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+      const overlapY = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+      if (overlapX <= 0 || overlapY <= 0) return null;
+      if (overlapX < overlapY) return { x: first.position.x < second.position.x ? 1 : -1, y: 0, penetration: overlapX };
+      return { x: 0, y: first.position.y < second.position.y ? 1 : -1, penetration: overlapY };
+    }
+    if (first.kind !== 'circle') {
+      const contact = this.collisionContact(second, first);
+      return contact ? { x: -contact.x, y: -contact.y, penetration: contact.penetration } : null;
+    }
+    const bounds = this.bodyBounds(second);
+    const closestX = Math.max(bounds.left, Math.min(first.position.x, bounds.right));
+    const closestY = Math.max(bounds.top, Math.min(first.position.y, bounds.bottom));
+    const dx = closestX - first.position.x;
+    const dy = closestY - first.position.y;
+    const distance = Math.hypot(dx, dy);
+    if (distance > 0) {
+      if (distance >= first.radius) return null;
+      return { x: dx / distance, y: dy / distance, penetration: first.radius - distance };
+    }
+    const edges = [
+      { distance: first.position.x - bounds.left, x: 1, y: 0 },
+      { distance: bounds.right - first.position.x, x: -1, y: 0 },
+      { distance: first.position.y - bounds.top, x: 0, y: 1 },
+      { distance: bounds.bottom - first.position.y, x: 0, y: -1 }
+    ].sort((a, b) => a.distance - b.distance);
+    const edge = edges[0];
+    return { x: edge.x, y: edge.y, penetration: first.radius + edge.distance };
+  }
+
+  private resolveCollision(first: Body, second: Body): boolean {
+    const contact = this.collisionContact(first, second);
+    if (!contact) return false;
+    first.contacts.add(second.id); second.contacts.add(first.id);
+    const inverseFirst = first.static ? 0 : 1 / first.mass;
+    const inverseSecond = second.static ? 0 : 1 / second.mass;
+    const inverseTotal = inverseFirst + inverseSecond;
+    if (inverseTotal === 0) return true;
+    const correction = Math.max(contact.penetration - 0.01, 0) * 0.82 / inverseTotal;
+    first.position.x -= contact.x * correction * inverseFirst;
+    first.position.y -= contact.y * correction * inverseFirst;
+    second.position.x += contact.x * correction * inverseSecond;
+    second.position.y += contact.y * correction * inverseSecond;
+    const relativeX = second.velocity.x - first.velocity.x;
+    const relativeY = second.velocity.y - first.velocity.y;
+    const separatingSpeed = relativeX * contact.x + relativeY * contact.y;
+    if (separatingSpeed >= 0) return true;
+    const restitution = Math.min(first.restitution, second.restitution);
+    const impulse = -(1 + restitution) * separatingSpeed / inverseTotal;
+    first.velocity.x -= impulse * contact.x * inverseFirst;
+    first.velocity.y -= impulse * contact.y * inverseFirst;
+    second.velocity.x += impulse * contact.x * inverseSecond;
+    second.velocity.y += impulse * contact.y * inverseSecond;
+    return true;
+  }
+
+  private solveObjectCollisions(): void {
+    const bodies = this.objects.filter((body) => body.active && body.collidable && !body.destroyed);
+    for (let firstIndex = 0; firstIndex < bodies.length; firstIndex += 1) {
+      for (let secondIndex = firstIndex + 1; secondIndex < bodies.length; secondIndex += 1) {
+        this.resolveCollision(bodies[firstIndex], bodies[secondIndex]);
+      }
+    }
+  }
+
   updateInput(pointer?: Partial<WorldInput['pointer']>, key?: string, pressed?: boolean): void {
     if (pointer) {
       const next = pointer.x == null || pointer.y == null
@@ -300,14 +391,20 @@ export class World {
   advance(dt: number): void {
     for (const body of this.objects) {
       body.collisions.clear();
+      body.contacts.clear();
       if (!body.active || body.destroyed) continue;
       if (body.trailLength) {
         body.trail.push({ x: body.position.x, y: body.position.y });
         if (body.trail.length > body.trailLength) body.trail.shift();
       }
-      body.position.x += body.velocity.x * dt;
-      body.position.y += body.velocity.y * dt;
-      if (body.bounce) body.bounceInside(this.bounds);
+      if (!body.static) {
+        body.position.x += body.velocity.x * dt;
+        body.position.y += body.velocity.y * dt;
+      }
+    }
+    for (let iteration = 0; iteration < this.collisionIterations; iteration += 1) {
+      for (const body of this.objects) if (body.bounce && !body.destroyed) body.bounceInside(this.bounds);
+      this.solveObjectCollisions();
     }
     this.objects = this.objects.filter((body) => !body.destroyed);
   }

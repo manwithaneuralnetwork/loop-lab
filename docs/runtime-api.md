@@ -45,6 +45,8 @@ export function update(world, dt, params) {}
 
 All renderable objects expose a stable `id`, plus `position`, `velocity`, `color`, `rotation`, `opacity`, `name`, `layer`, `visible`, `active`, and `tags`. Circles and rectangles may set `bounce`, `restitution`, and `trail`. `body.hit("bottom")` and the other boundary names report the previous fixed step's boundary contact.
 
+Circles and axis-aligned rectangles collide with one another by default. Set `static: true` for immovable walls, `mass` to override area-based mass, or `collidable: false` for decorative shapes. `body.touches(other)` reports object contact during the previous fixed step. Loop Lab resolves these lightweight collisions internally without requiring a physics dependency; rotated collision shapes and constraints remain outside this solver.
+
 Objects render from the lowest layer to the highest. Insertion order is preserved inside a layer.
 
 ## Camera
@@ -93,4 +95,6 @@ if (ball.hit("bottom") && world.hasAsset("assets/collision.mp3")) {
 }
 ```
 
-The transport bar controls preview mute and master volume. Browsers require a Run, Play, or viewport click before audio starts. WebM exports remain silent in this milestone; audio muxing is a separate export concern.
+The transport bar controls preview mute and master volume. Browsers require a Run, Play, or viewport click before audio starts. The mixer limits each sound to six simultaneous voices and the project to 24 voices, normalizes dense repeats, then runs the mix through a fast compressor and a soft-clipped ceiling of approximately −9.8 dBFS. Timing is preserved without a collision cooldown.
+
+Local WebM exports include project audio through an Opus track when the browser supports it. The export renderer uses the same voice management and output limiter as the live preview.

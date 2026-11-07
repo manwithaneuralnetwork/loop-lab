@@ -1,4 +1,4 @@
-import type { ParameterValues } from '../engine/protocol';
+import type { AudioCommand, ParameterValues } from '../engine/protocol';
 
 export type ExportWorkerRequest =
   | {
@@ -18,6 +18,6 @@ export type ExportWorkerRequest =
   | { type: 'next' };
 
 export type ExportWorkerResponse =
-  | { type: 'frame'; bitmap: ImageBitmap; frame: number; totalFrames: number }
+  | { type: 'frame'; bitmap: ImageBitmap; frame: number; totalFrames: number; audio: AudioCommand[] }
   | { type: 'complete' }
   | { type: 'error'; message: string };

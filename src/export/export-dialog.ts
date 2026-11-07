@@ -3,6 +3,7 @@ import type { ParameterDefinition, ParameterSchema, ParameterValue, ParameterVal
 import { buildExportPlan, coerceParameterValue, randomizeParameters, type ExportPlan } from './export-options';
 import type { ExportWorkerResponse } from './export-protocol';
 import type { ExportHistoryEntry } from '../project-store';
+import { AudioEngine } from '../audio-engine';
 
 export interface ExportSource {
   code: string;
@@ -25,6 +26,8 @@ function displayName(key: string): string {
 function preferredMimeType(): string | null {
   if (typeof MediaRecorder === 'undefined') return null;
   return [
+    'video/webm;codecs=vp9,opus',
+    'video/webm;codecs=vp8,opus',
     'video/webm;codecs=vp9',
     'video/webm;codecs=vp8',
     'video/webm'
@@ -60,6 +63,7 @@ export class ExportDialog {
   private rendering = false;
   private nextFrameTimer: number | null = null;
   private renderStartedAt = 0;
+  private exportAudio: AudioEngine | null = null;
 
   constructor(
     openButton: HTMLButtonElement,
@@ -170,7 +174,8 @@ export class ExportDialog {
 
   private updateSummary(): void {
     const plan = this.plan();
-    this.summary.textContent = `${plan.width} × ${plan.height}  ·  ${plan.fps} fps  ·  ${plan.duration.toFixed(2).replace(/\.00$/, '')} sec`;
+    const audio = this.source && Object.values(this.source.assets).some((asset) => asset.startsWith('data:audio/')) ? '  ·  audio' : '';
+    this.summary.textContent = `${plan.width} × ${plan.height}  ·  ${plan.fps} fps  ·  ${plan.duration.toFixed(2).replace(/\.00$/, '')} sec${audio}`;
   }
 
   private renderParameters(): void {
@@ -279,6 +284,17 @@ export class ExportDialog {
 
       const stream = canvas.captureStream(0);
       const track = stream.getVideoTracks()[0] as CanvasCaptureMediaStreamTrack;
+      const audioSources = Object.values(this.source.assets).filter((asset) => asset.startsWith('data:audio/'));
+      if (audioSources.length) {
+        this.setStatus('Decoding project audio…');
+        const audioContext = new AudioContext();
+        const audioDestination = audioContext.createMediaStreamDestination();
+        this.exportAudio = new AudioEngine(audioContext, audioDestination);
+        this.exportAudio.setVolume(0.8);
+        await this.exportAudio.resume();
+        await this.exportAudio.preload(audioSources);
+        audioDestination.stream.getAudioTracks().forEach((audioTrack) => stream.addTrack(audioTrack));
+      }
       this.stream = stream;
       const chunks: Blob[] = [];
       const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 3_000_000 });
@@ -316,6 +332,7 @@ export class ExportDialog {
       worker.onmessage = (event: MessageEvent<ExportWorkerResponse>) => {
         const message = event.data;
         if (message.type === 'frame') {
+          message.audio.forEach((command) => void this.exportAudio?.play(command));
           context.clearRect(0, 0, plan.width, plan.height);
           context.drawImage(message.bitmap, 0, 0, plan.width, plan.height);
           message.bitmap.close();
@@ -380,5 +397,7 @@ export class ExportDialog {
     this.recorder = null;
     this.captureCanvas?.remove();
     this.captureCanvas = null;
+    this.exportAudio?.dispose();
+    this.exportAudio = null;
   }
 }
