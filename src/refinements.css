@@ -62,3 +62,30 @@
 #codeEditor .cm-scroller::-webkit-scrollbar-track { background: transparent; }
 #codeEditor .cm-scroller::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 8px; background: #6a6f76; background-clip: padding-box; }
 .save-state.unsaved, .crumbs em.unsaved { color: #ffb17d; }
+
+/* Workspace annotation pass */
+.app-actions .run-button, .app-actions .export-button { min-width: auto; padding-inline: 11px; font-size: 10px; }
+.app-actions .run-button { display: inline-flex; align-items: center; gap: 7px; border: 1px solid #3b3e43; background: #202226; color: #c0c3c8; }
+.app-actions .run-button:hover { border-color: #575b62; background: #292c31; color: #fff; }
+.app-actions .export-button { padding-inline: 13px; }
+.play-icon { width: 0; height: 0; border-top: 4px solid transparent; border-bottom: 4px solid transparent; border-left: 6px solid currentColor; }
+.stagebar { padding-inline: 8px; }
+.stage-heading { gap: 9px; }
+.live-status { display: inline-flex; align-items: center; gap: 5px; padding: 0 !important; color: #80e9a6 !important; font-size: 7px !important; text-transform: uppercase; }
+.live-status i { width: 5px !important; height: 5px !important; border-radius: 50%; background: #80e9a6 !important; box-shadow: 0 0 6px rgba(128,233,166,.5); }
+.stage-tools { gap: 5px; }
+.dimensions { display: flex; align-items: center; gap: 4px; height: 24px; padding: 0 5px; border: 1px solid #32353a; border-radius: 3px; background: #151619; }
+.dimensions label { display: flex; align-items: center; gap: 3px; color: #666b73; font: 7px "DM Mono", monospace; }
+.dimensions input { width: 34px; border: 0; outline: 0; padding: 0; background: transparent; color: #b9bdc3; text-align: center; font: 8px "DM Mono", monospace; appearance: textfield; }
+.dimensions input::-webkit-inner-spin-button { display: none; }
+.dimensions > span { color: #555a61; font-size: 8px; }
+.viewport > .live, .viewport > .size { display: none; }
+.transport { grid-template-columns: auto minmax(92px,auto) 1fr auto; gap: 16px; padding-inline: 14px; }
+.transport-controls { display: flex; align-items: center; gap: 6px; }
+.transport-controls button { display: grid; place-items: center; }
+.transport p { margin: 0; white-space: nowrap; }
+.transport .speed { display: inline-flex; align-items: center; justify-content: center; gap: 7px; width: 48px; padding: 0 7px; }
+.chevron-down { display: inline-block; flex: 0 0 auto; width: 5px; height: 5px; margin: -2px 3px 0 1px; border-right: 1px solid currentColor; border-bottom: 1px solid currentColor; transform: rotate(45deg); vertical-align: middle; }
+.properties h3 { gap: 6px; }
+#codeEditor .cm-gutters { padding-top: 0 !important; }
+#codeEditor .cm-lineNumbers .cm-gutterElement { line-height: 1.7; }

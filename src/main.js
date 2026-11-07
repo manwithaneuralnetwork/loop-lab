@@ -190,7 +190,7 @@ onmessage = (event) => {
 
 const RUNTIME_HTML = `<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' blob:; worker-src blob:; style-src 'unsafe-inline'; connect-src 'none'"><style>*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent}canvas{display:block;width:100%;height:100%}</style></head><body><script>
 const workerSource = ${JSON.stringify(WORKER_SOURCE)};
-let worker, canvas;
+let worker, canvas, logicalWidth = 1080, logicalHeight = 1080;
 function bootWorker() {
   if (worker) worker.terminate();
   if (canvas) canvas.remove();
@@ -198,17 +198,20 @@ function bootWorker() {
   worker = new Worker(URL.createObjectURL(new Blob([workerSource], {type:'text/javascript'})));
   worker.onmessage = (event) => parent.postMessage({ channel:'loop-runtime', ...event.data }, '*');
   worker.onerror = (event) => parent.postMessage({ channel:'loop-runtime', type:'error', message:event.message }, '*');
-  const rect = document.body.getBoundingClientRect();
   const offscreen = canvas.transferControlToOffscreen();
-  worker.postMessage({ type:'init', canvas:offscreen, width:Math.max(1,Math.round(rect.width)), height:Math.max(1,Math.round(rect.height)) }, [offscreen]);
+  worker.postMessage({ type:'init', canvas:offscreen, width:logicalWidth, height:logicalHeight }, [offscreen]);
 }
 bootWorker();
 addEventListener('message', event => {
   if (!event.data || event.data.channel !== 'loop-host') return;
   if (event.data.type === 'replace-worker') bootWorker();
+  else if (event.data.type === 'dimensions') {
+    logicalWidth = event.data.width;
+    logicalHeight = event.data.height;
+    worker?.postMessage({ type:'resize', width:logicalWidth, height:logicalHeight });
+  }
   else worker?.postMessage(event.data);
 });
-new ResizeObserver(entries => { const r=entries[0].contentRect; worker?.postMessage({type:'resize',width:Math.max(1,Math.round(r.width)),height:Math.max(1,Math.round(r.height))}); }).observe(document.body);
 <\/script></body></html>`;
 
 const editorBody = document.querySelector('.editor-body');
@@ -222,7 +225,9 @@ const savedProject = (() => {
 const project = {
   code: savedProject?.code || SAMPLE_CODE,
   parameterValues: savedProject?.parameterValues || {},
-  gridVisible: savedProject?.gridVisible ?? true
+  gridVisible: savedProject?.gridVisible ?? true,
+  worldWidth: savedProject?.worldWidth || 1080,
+  worldHeight: savedProject?.worldHeight || 1080
 };
 const saveState = document.querySelector('.crumbs em');
 let saveTimer = null;
@@ -290,8 +295,7 @@ frame.setAttribute('title', 'Loop Lab simulation runtime');
 frame.srcdoc = RUNTIME_HTML;
 viewport.prepend(frame);
 
-const primaryButton = document.querySelector('.app-actions .primary');
-primaryButton.textContent = 'Run code';
+const primaryButton = document.querySelector('.app-actions .run-button');
 primaryButton.title = 'Run code (Ctrl/⌘ + Enter)';
 const transportButtons = [...document.querySelectorAll('.transport > div:first-child button')];
 const [restartButton, playButton, stepButton] = transportButtons;
@@ -299,6 +303,8 @@ const timeReadout = document.querySelector('.transport p');
 const progressBar = document.querySelector('.timeline i');
 const playhead = document.querySelector('.timeline span');
 const gridButton = document.querySelector('.grid-button');
+const worldWidthInput = document.querySelector('#worldWidth');
+const worldHeightInput = document.querySelector('#worldHeight');
 const logs = document.querySelector('.logs');
 const properties = document.querySelector('.properties');
 let runtimeReady = false;
@@ -341,7 +347,7 @@ function renderParameters(schema, values) {
   });
   groups.forEach((items, groupName) => {
     const section = document.createElement('section');
-    section.innerHTML = `<h3>⌄ &nbsp; ${escapeHTML(groupName.toUpperCase())}</h3>`;
+    section.innerHTML = `<h3><span class="chevron-down"></span>${escapeHTML(groupName.toUpperCase())}</h3>`;
     items.forEach(([key, config]) => {
       const label = document.createElement('label');
       const title = key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase());
@@ -378,6 +384,7 @@ window.addEventListener('message', event => {
   const message = event.data;
   if (message.type === 'ready') {
     runtimeReady = true;
+    send({ type:'dimensions', width:project.worldWidth, height:project.worldHeight });
     if (pendingCode !== null) {
       send({ type:'run', code:pendingCode, params:project.parameterValues });
       pendingCode = null;
@@ -408,6 +415,29 @@ playButton.textContent = 'Ⅱ';
 playButton.addEventListener('click', () => { isPlaying = !isPlaying; playButton.textContent = isPlaying ? 'Ⅱ' : '▶'; send({type:'play',playing:isPlaying}); });
 stepButton.addEventListener('click', () => { isPlaying = false; playButton.textContent = '▶'; send({type:'step'}); });
 if (!project.gridVisible) { viewport.classList.add('grid-off'); gridButton.classList.add('inactive'); }
+worldWidthInput.value = project.worldWidth;
+worldHeightInput.value = project.worldHeight;
+function applyViewportAspect() {
+  viewport.style.aspectRatio = `${project.worldWidth} / ${project.worldHeight}`;
+}
+applyViewportAspect();
+function updateDimensions() {
+  project.worldWidth = Math.max(64, Math.min(4096, Number(worldWidthInput.value) || 1080));
+  project.worldHeight = Math.max(64, Math.min(4096, Number(worldHeightInput.value) || 1080));
+  worldWidthInput.value = project.worldWidth;
+  worldHeightInput.value = project.worldHeight;
+  applyViewportAspect();
+  send({ type:'dimensions', width:project.worldWidth, height:project.worldHeight });
+  send({ type:'restart' });
+  scheduleSave();
+}
+let dimensionTimer = null;
+function scheduleDimensionUpdate() {
+  clearTimeout(dimensionTimer);
+  dimensionTimer = setTimeout(updateDimensions, 250);
+}
+worldWidthInput.addEventListener('input', scheduleDimensionUpdate);
+worldHeightInput.addEventListener('input', scheduleDimensionUpdate);
 gridButton.addEventListener('click', () => {
   project.gridVisible = viewport.classList.toggle('grid-off') === false;
   gridButton.classList.toggle('inactive', !project.gridVisible);
