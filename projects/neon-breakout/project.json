@@ -13,6 +13,12 @@
       "id": "neon-bot",
       "path": "bot.js",
       "kind": "code"
+    },
+    {
+      "id": "neon-collision-audio",
+      "path": "assets/collision.mp3",
+      "kind": "asset",
+      "mime": "audio/mpeg"
     }
   ],
   "folders": [

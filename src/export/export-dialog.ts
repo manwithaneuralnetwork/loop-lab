@@ -453,26 +453,44 @@ export class ExportDialog {
       const worker = new Worker(new URL('./export.worker.ts', import.meta.url), { type: 'module' });
       this.worker = worker;
       worker.onerror = (event) => this.finishWithError(event.message || 'The export worker stopped unexpectedly.');
+      let captureStartedAt = 0;
+      const requestNextFrame = () => {
+        worker.postMessage({ type: 'next' });
+        this.frameWatchdog = window.setTimeout(() => this.finishWithError('Export stopped: one simulation frame exceeded the 5 second execution limit.'), 5000);
+      };
+      const presentFrame = (message: Extract<ExportWorkerResponse, { type: 'frame' }>) => {
+        if (this.cancelled) { message.bitmap.close(); return; }
+        if (!captureStartedAt) captureStartedAt = performance.now();
+        renderedFrames = message.frame;
+        message.audio.forEach((command) => void this.exportAudio?.play(command));
+        context.clearRect(0, 0, plan.width, plan.height);
+        context.drawImage(message.bitmap, 0, 0, plan.width, plan.height);
+        message.bitmap.close();
+        track.requestFrame();
+        const percent = (message.frame / message.totalFrames) * 100;
+        this.progress.querySelector('i')?.setAttribute('style', `width: ${percent}%`);
+        const elapsed = (performance.now() - captureStartedAt) / 1000;
+        const remaining = message.frame > 0 ? Math.max(0, (elapsed / message.frame) * (message.totalFrames - message.frame)) : 0;
+        this.setStatus(`Rendering frame ${message.frame.toLocaleString()} of ${message.totalFrames.toLocaleString()} · about ${Math.ceil(remaining)}s left`);
+        // Render the next bitmap while this one is being held for its video
+        // interval. Keeping one frame ready avoids adding worker time to every
+        // capture interval and greatly reduces visible stalls.
+        requestNextFrame();
+      };
       worker.onmessage = (event: MessageEvent<ExportWorkerResponse>) => {
         if (this.frameWatchdog != null) window.clearTimeout(this.frameWatchdog);
         this.frameWatchdog = null;
         const message = event.data;
         if (message.type === 'frame') {
-          renderedFrames = message.frame;
-          message.audio.forEach((command) => void this.exportAudio?.play(command));
-          context.clearRect(0, 0, plan.width, plan.height);
-          context.drawImage(message.bitmap, 0, 0, plan.width, plan.height);
-          message.bitmap.close();
-          track.requestFrame();
-          const percent = (message.frame / message.totalFrames) * 100;
-          this.progress.querySelector('i')?.setAttribute('style', `width: ${percent}%`);
-          const elapsed = (performance.now() - this.renderStartedAt) / 1000;
-          const remaining = message.frame > 0 ? Math.max(0, (elapsed / message.frame) * (message.totalFrames - message.frame)) : 0;
-          this.setStatus(`Rendering frame ${message.frame.toLocaleString()} of ${message.totalFrames.toLocaleString()} · about ${Math.ceil(remaining)}s left`);
-          this.nextFrameTimer = window.setTimeout(() => {
-            worker.postMessage({ type: 'next' });
-            this.frameWatchdog = window.setTimeout(() => this.finishWithError('Export stopped: one simulation frame exceeded the 5 second execution limit.'), 5000);
-          }, 1000 / plan.fps);
+          const dueAt = captureStartedAt
+            ? captureStartedAt + (message.frame - 1) * (1000 / plan.fps)
+            : performance.now();
+          const delay = Math.max(0, dueAt - performance.now());
+          if (delay > 1) this.nextFrameTimer = window.setTimeout(() => {
+            this.nextFrameTimer = null;
+            presentFrame(message);
+          }, delay);
+          else presentFrame(message);
         } else if (message.type === 'complete') {
           renderedFrames = message.frames;
           conditionFinished = message.finished;

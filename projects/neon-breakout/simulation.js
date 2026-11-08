@@ -4,7 +4,7 @@ export const parameters = {
   columns:     { value: 8, min: 5, max: 12, step: 1, group: "Game" },
   rows:        { value: 4, min: 3, max: 9, step: 1, group: "Game" },
   lives:       { value: 3, min: 1, max: 7, step: 1, group: "Game" },
-  ballSpeed:   { value: 760, min: 260, max: 900, step: 20, group: "Motion" },
+  ballSpeed:   { value: 860, min: 260, max: 900, step: 20, group: "Motion" },
   paddleWidth: { value: 150, min: 80, max: 240, step: 10, group: "Motion" },
   brickGap:    { value: 8, min: 2, max: 18, step: 1, group: "Layout" },
   ballColor:   { value: "#f6f3ea", type: "color", group: "Appearance" },
@@ -37,9 +37,43 @@ function launch(world, state, params) {
 function burst(world, state, brick) {
   const echo = world.rectangle({
     x: brick.position.x, y: brick.position.y, width: brick.width, height: brick.height,
-    color: brick.color, opacity: 0.72, collidable: false, layer: 4
+    color: brick.color, opacity: 0.78, collidable: false, active: false, layer: 4
   });
-  state.effects.push(echo);
+  state.effects.push({ body: echo, kind: "echo", age: 0, duration: 0.46, width: brick.width, height: brick.height });
+  for (let index = 0; index < 7; index++) {
+    const angle = (Math.PI * 2 * index) / 7 + world.random(-0.18, 0.18);
+    const speed = world.random(105, 215);
+    const shard = world.rectangle({
+      x: brick.position.x + Math.cos(angle) * brick.width * 0.16,
+      y: brick.position.y + Math.sin(angle) * brick.height * 0.18,
+      vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+      width: world.random(5, 10), height: world.random(2, 5),
+      rotation: angle, color: brick.color, opacity: 0.9,
+      collidable: false, layer: 5
+    });
+    state.effects.push({ body: shard, kind: "shard", age: 0, duration: world.random(0.34, 0.56) });
+  }
+}
+
+function updateEffects(state, dt) {
+  for (const effect of state.effects) {
+    effect.age += dt;
+    const progress = Math.min(1, effect.age / effect.duration);
+    const easeOut = 1 - Math.pow(1 - progress, 3);
+    if (effect.kind === "echo") {
+      effect.body.width = effect.width * (1 + easeOut * 0.42);
+      effect.body.height = effect.height * (1 + easeOut * 0.5);
+      effect.body.opacity = Math.pow(1 - progress, 2) * 0.78;
+    } else {
+      const damping = Math.pow(0.035, dt);
+      effect.body.velocity.x *= damping;
+      effect.body.velocity.y *= damping;
+      effect.body.rotation += dt * 5.5;
+      effect.body.opacity = Math.pow(1 - progress, 1.65) * 0.9;
+    }
+    if (progress >= 1) effect.body.destroy();
+  }
+  state.effects = state.effects.filter((effect) => !effect.body.destroyed);
 }
 
 function playHit(world, state, volume, rate) {
@@ -125,7 +159,7 @@ export function setup(world, params) {
   world.gameState = {
     score: 0, lives: params.lives, startingLives: params.lives, remaining,
     paddle, ball, scoreLabel, livesLabel, hint,
-    serveFrames: 0, soundGate: 0, effects: [], finished: false,
+    serveFrames: 0, soundGate: 0, effects: [], finished: false, endFrames: 0, endReason: "",
     botPaddleX: null, botAim: null,
     layout: {
       leftColumnX: margin + brickWidth / 2,
@@ -138,8 +172,19 @@ export function setup(world, params) {
 
 export function update(world, dt, params) {
   const state = world.gameState;
-  if (!state || state.finished) return;
+  if (!state) return;
   const { paddle, ball } = state;
+
+  state.scoreLabel.text = "SCORE  " + String(state.score).padStart(6, "0");
+  state.livesLabel.text = "LIVES  " + String(state.lives).padStart(2, "0");
+  state.soundGate = Math.max(0, state.soundGate - 1);
+  updateEffects(state, dt);
+
+  if (state.finished) {
+    state.endFrames -= 1;
+    if (state.endFrames <= 0) world.finish(state.endReason);
+    return;
+  }
 
   if (Number.isFinite(state.botPaddleX)) {
     paddle.position.x = state.botPaddleX;
@@ -152,15 +197,6 @@ export function update(world, dt, params) {
   paddle.width = params.paddleWidth;
   paddle.color = params.paddleColor;
   paddle.position.x = Math.max(paddle.width / 2 + 18, Math.min(world.width - paddle.width / 2 - 18, paddle.position.x));
-
-  state.scoreLabel.text = "SCORE  " + String(state.score).padStart(6, "0");
-  state.livesLabel.text = "LIVES  " + String(state.lives).padStart(2, "0");
-  state.soundGate = Math.max(0, state.soundGate - 1);
-  for (const effect of state.effects) {
-    effect.opacity -= dt * 3.4; effect.width += dt * 90; effect.height += dt * 34;
-    if (effect.opacity <= 0) effect.destroy();
-  }
-  state.effects = state.effects.filter((effect) => !effect.destroyed);
 
   if (state.serveFrames > 0) {
     state.serveFrames -= 1;
@@ -197,19 +233,19 @@ export function update(world, dt, params) {
   if (bricksHit) playHit(world, state, 0.12, 1.35 + Math.min(0.35, bricksHit * 0.04));
 
   if (state.remaining <= 0) {
-    state.finished = true;
+    state.finished = true; state.endFrames = 60; state.endReason = "All bricks cleared"; ball.visible = false;
     addText(world, "result", "FIELD CLEARED", world.width / 2, world.height / 2 - 12, 46, "#62d6a5", "center", 12);
     addText(world, "final-score", "FINAL SCORE  " + state.score, world.width / 2, world.height / 2 + 48, 18, "#f2f0ea", "center", 12);
-    world.finish("All bricks cleared"); return;
+    return;
   }
 
   if (ball.hit("bottom")) {
     state.lives -= 1; playHit(world, state, 0.1, 0.72);
     if (state.lives <= 0) {
-      state.finished = true; ball.visible = false;
+      state.finished = true; state.endFrames = 60; state.endReason = "No lives remaining"; ball.visible = false;
       addText(world, "result", "SIGNAL LOST", world.width / 2, world.height / 2 - 12, 46, "#ff6b2c", "center", 12);
       addText(world, "final-score", "FINAL SCORE  " + state.score, world.width / 2, world.height / 2 + 48, 18, "#f2f0ea", "center", 12);
-      world.finish("No lives remaining"); return;
+      return;
     }
     resetBall(world, state, 58); return;
   }

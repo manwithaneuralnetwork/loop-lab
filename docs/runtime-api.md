@@ -129,3 +129,5 @@ if (ball.hit("bottom") && world.hasAsset("assets/collision.mp3")) {
 The transport bar controls preview mute and master volume. Browsers require a Run, Play, or viewport click before audio starts. The mixer allows up to 32 simultaneous voices per sound and 64 for the project, normalizes dense repeats, then runs the mix through a fast compressor and a soft-clipped ceiling of approximately −9.8 dBFS. Playing voices are never stolen or truncated; only excess new voices are declined under pathological load. Timing is preserved without a collision cooldown.
 
 Local WebM exports include project audio through an Opus track when the browser supports it. The export renderer uses the same voice management and output limiter as the live preview.
+
+The current MediaRecorder exporter computes one bitmap ahead and presents frames against an absolute cadence so worker render time does not accumulate into every video interval. Browser or system pressure can still make MediaRecorder drop a captured frame; guaranteed offline timestamps and muxing remain a future WebCodecs-based exporter milestone.

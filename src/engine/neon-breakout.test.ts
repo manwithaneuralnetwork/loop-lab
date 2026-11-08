@@ -4,20 +4,25 @@ import botSource from '../../projects/neon-breakout/bot.js?raw';
 import { SimulationRuntime } from './simulation';
 
 describe('Neon Breakout project', () => {
-  it('loads the real project and lets bot.js play without losing a life', () => {
+  it('lets bot.js clear the board, plays the hit effect, and holds the result for one second', () => {
     const runtime = new SimulationRuntime(720, 960);
     runtime.loadProject({
       'simulation.js': simulationSource,
       'bot.js': botSource
     }, 'simulation.js', {}, {}, 'bot.js');
 
-    for (let frame = 0; frame < 60 * 60 && !runtime.world.finished; frame += 1) runtime.step();
     const game = runtime.world as typeof runtime.world & {
-      gameState: { score: number; lives: number; startingLives: number; remaining: number };
+      gameState: { score: number; lives: number; startingLives: number; remaining: number; finished: boolean; effects: unknown[] };
     };
+    for (let frame = 0; frame < 59 * 60 && !game.gameState.finished; frame += 1) runtime.step();
     expect(game.gameState.score).toBeGreaterThan(0);
     expect(game.gameState.lives).toBe(game.gameState.startingLives);
     expect(game.gameState.remaining).toBe(0);
+    expect(game.gameState.effects.length).toBeGreaterThan(0);
+    expect(runtime.world.finished).toBe(false);
+    for (let frame = 0; frame < 59; frame += 1) runtime.step();
+    expect(runtime.world.finished).toBe(false);
+    runtime.step();
     expect(runtime.world.finishReason).toBe('All bricks cleared');
   });
 });
