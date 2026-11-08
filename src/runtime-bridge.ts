@@ -58,6 +58,7 @@ export class RuntimeBridge {
   replace(): void { this.start(); }
 
   resumeAudio(): Promise<void> { return this.audio.resume(); }
+  suspendAudio(): Promise<void> { return this.audio.suspend(); }
   setAudioVolume(value: number): void { this.audio.setVolume(value); }
   setAudioMuted(muted: boolean): void { this.audio.setMuted(muted); }
   isAudioMuted(): boolean { return this.audio.isMuted(); }

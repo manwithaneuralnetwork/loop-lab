@@ -1,0 +1,28 @@
+{
+  "id": "4c78b8d4-65e3-4a82-9506-1eb4d3a4f092",
+  "name": "Particle Cascade",
+  "createdAt": "2026-11-08T20:00:00.000Z",
+  "updatedAt": "2026-11-08T20:16:20.045Z",
+  "files": [
+    {
+      "id": "cascade-simulation",
+      "path": "simulation.js",
+      "kind": "code"
+    }
+  ],
+  "folders": [
+    "assets"
+  ],
+  "activeFileId": "cascade-simulation",
+  "openFileIds": [
+    "cascade-simulation"
+  ],
+  "parameterValues": {},
+  "gridVisible": true,
+  "worldWidth": 900,
+  "worldHeight": 900,
+  "botMode": false,
+  "exportHistory": [],
+  "format": "loop-lab-project-directory",
+  "version": 1
+}

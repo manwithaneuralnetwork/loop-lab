@@ -25,6 +25,11 @@ export class AudioEngine {
     if (context.state === 'suspended') await context.resume();
   }
 
+  async suspend(): Promise<void> {
+    this.voices.splice(0).forEach((voice) => { try { voice.source.stop(); } catch { /* already stopped */ } });
+    if (this.context?.state === 'running') await this.context.suspend();
+  }
+
   setVolume(value: number): void {
     this.volume = Math.max(0, Math.min(1, value));
     this.updateGain();

@@ -176,9 +176,23 @@ Object.defineProperty(window, 'loopLabAgent', {
   }
 });
 new ProjectActions(project, workspaceFiles, { onNotice: (message) => addLog(message) });
+let resumeAfterDashboard = false;
+let dashboardProjectChanged = false;
 const dashboard = new ProjectDashboard(project, {
   onNotice: (message) => addLog(message, 'ok'),
-  onNavigate: () => { navigatingToProject = true; if (saveTimer) clearTimeout(saveTimer); }
+  onNavigate: () => { navigatingToProject = true; if (saveTimer) clearTimeout(saveTimer); },
+  onOpen: () => { resumeAfterDashboard = isPlaying; runtime.post({ type: 'play', playing: false }); void runtime.suspendAudio(); },
+  onClose: () => {
+    if (dashboardProjectChanged) { dashboardProjectChanged = false; runCode(); }
+    else if (resumeAfterDashboard) { void runtime.resumeAudio(); runtime.post({ type: 'play', playing: true }); }
+  },
+  onProjectUpdated: (updated) => {
+    query<HTMLElement>('.crumbs > strong').textContent = updated.name;
+    worldWidthInput.value = String(updated.worldWidth); worldHeightInput.value = String(updated.worldHeight); applyViewportAspect();
+    viewport.classList.toggle('grid-off', !updated.gridVisible); gridButton.classList.toggle('inactive', !updated.gridVisible);
+    botModeButton.classList.toggle('active', updated.botMode); botModeButton.setAttribute('aria-pressed', String(updated.botMode));
+    runtime.resize(updated.worldWidth, updated.worldHeight); dashboardProjectChanged = true;
+  }
 });
 query<HTMLButtonElement>('.projects-link').addEventListener('click', () => void dashboard.open());
 query<HTMLButtonElement>('.project-back').addEventListener('click', () => void dashboard.open());
