@@ -265,10 +265,10 @@
 .file-row { width: 100%; min-height: 29px; display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; color: #9da1a8; }
 .file-row.active { background: #24272b; box-shadow: inset 2px 0 var(--orange); color: white; }
 .file-row.selected:not(.active) { background: #202226; }
-.file-row .file-main { min-width: 0; width: 100%; height: 29px; display: flex; align-items: center; gap: 7px; padding: 0 5px 0 calc(12px + var(--tree-depth, 0) * 14px); overflow: hidden; color: inherit; text-align: left; font-size: 10px; white-space: nowrap; text-overflow: ellipsis; }
+.file-row .file-main { min-width: 0; width: 100%; height: 29px; display: flex; align-items: center; gap: 6px; padding: 0 5px 0 calc(9px + var(--tree-depth, 0) * 8px); overflow: hidden; color: inherit; text-align: left; font-size: 10px; white-space: nowrap; text-overflow: ellipsis; }
 .file-row .file-main span { flex: 0 0 auto; }
 .file-actions { display: flex; align-items: center; padding-right: 3px; }
-.file-row .file-action { display: grid; place-items: center; width: 25px; height: 25px; border-radius: 3px; opacity: 0; color: #858a91; font-size: 13px; line-height: 1; }
+.file-row .file-action { display: grid; place-items: center; width: 25px; height: 25px; padding: 0 0 1px; border-radius: 3px; opacity: 0; color: #858a91; font: 13px/1 Arial, sans-serif; text-align: center; }
 .file-row:hover .file-action, .file-row.selected .file-action, .file-row.active .file-action { opacity: 1; }
 .file-row .file-action:hover { background: #34373c; color: white; }
 .file-row .file-action.danger:hover { color: #ff8465; }
