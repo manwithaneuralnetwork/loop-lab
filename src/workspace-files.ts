@@ -2,6 +2,8 @@ import { createProjectFile, uniquePath, type ProjectFile, type ProjectState } fr
 
 interface WorkspaceFilesOptions {
   onActivate(file: ProjectFile): void;
+  onAgentOpen(): void;
+  isAgentActive(): boolean;
   onChange(): void;
   onNotice(message: string): void;
 }
@@ -147,6 +149,10 @@ export class WorkspaceFiles {
       tab.addEventListener('click', () => this.activate(file));
       this.tabs.append(tab);
     });
+    const agent = document.createElement('button');
+    agent.className = `agent-tab ${this.options.isAgentActive() ? 'active' : ''}`;
+    agent.innerHTML = '<span>✦</span> Agent'; agent.title = 'Open Loop Agent';
+    agent.addEventListener('click', () => this.options.onAgentOpen()); this.tabs.append(agent);
   }
 
   private activate(file: ProjectFile): void {
@@ -158,8 +164,8 @@ export class WorkspaceFiles {
     }
     this.project.activeFileId = file.id;
     if (!this.project.openFileIds.includes(file.id)) this.project.openFileIds.push(file.id);
-    this.render();
     this.options.onActivate(file);
+    this.render();
     this.options.onChange();
   }
 

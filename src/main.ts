@@ -10,6 +10,8 @@ import { ExportDialog } from './export/export-dialog';
 import { WorkspaceFiles } from './workspace-files';
 import { ProjectActions } from './project-actions';
 import { ProjectDashboard } from './project-dashboard';
+import { WorkspaceAgentAPI, type WorkspaceAgentRequest } from './agent/workspace-agent-api';
+import { AgentPanel } from './agent/agent-panel';
 
 function query<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -61,6 +63,7 @@ let isScrubbing = false;
 let suppressEditorChange = false;
 let errors = 0;
 let navigatingToProject = false;
+let agentPanel: AgentPanel;
 
 function entryFile(): ProjectFile {
   return project.files.find((file) => file.path === 'simulation.js') || project.files.find((file) => file.kind === 'code')!;
@@ -117,6 +120,7 @@ function editorLanguageFor(path: string): string {
 }
 
 function showFile(file: ProjectFile): void {
+  agentPanel?.close();
   suppressEditorChange = true;
   editor.setCode(file.content);
   suppressEditorChange = false;
@@ -127,8 +131,31 @@ function showFile(file: ProjectFile): void {
 let workspaceFiles: WorkspaceFiles;
 workspaceFiles = new WorkspaceFiles(project, {
   onActivate: showFile,
+  onAgentOpen: () => agentPanel.open(),
+  isAgentActive: () => agentPanel?.isOpen || false,
   onChange: scheduleSave,
   onNotice: (message) => addLog(message)
+});
+const workspaceAgentApi = new WorkspaceAgentAPI({
+  project,
+  runtime: () => ({ playing: isPlaying, errors, profile: profileStatus.textContent || 'No profile yet' }),
+  onFileWritten: (file) => {
+    if (!project.openFileIds.includes(file.id)) project.openFileIds.push(file.id);
+    project.activeFileId = file.id; showFile(file); workspaceFiles.render(); scheduleSave();
+  },
+  onRun: runCode
+});
+agentPanel = new AgentPanel(query<HTMLElement>('.editor'), {
+  api: workspaceAgentApi,
+  activeFile: () => project.files.find((file) => file.id === project.activeFileId)?.path || 'No active file',
+  onStateChange: () => workspaceFiles.render()
+});
+Object.defineProperty(window, 'loopLabAgent', {
+  configurable: true,
+  value: {
+    manifest: () => workspaceAgentApi.manifest(),
+    call: (request: WorkspaceAgentRequest) => workspaceAgentApi.call(request)
+  }
 });
 new ProjectActions(project, workspaceFiles, { onNotice: (message) => addLog(message) });
 const dashboard = new ProjectDashboard(project, {

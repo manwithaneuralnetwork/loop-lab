@@ -279,6 +279,61 @@
 .tabs button { flex: 0 0 auto; }
 .tabs button b { display: grid; place-items: center; min-width: 16px; height: 18px; margin-left: 3px; border-radius: 3px; font-size: 12px; }
 .tabs button b:hover { background: #303338; color: #ddd; }
+.tabs .agent-tab { position: sticky; right: 0; margin-left: auto; border-left: 1px solid var(--line); border-right: 0; background: #1b1d20; color: #a7abb2; }
+.tabs .agent-tab span { color: var(--orange); font-size: 12px; }
+.tabs .agent-tab:hover { background: #24272b; color: white; }
+.tabs .agent-tab.active { border-top-color: var(--orange); background: #17191c; color: white; box-shadow: inset 0 -1px #ff6b2c55; }
+
+/* Provider-neutral AI workspace. */
+.editor.agent-active { grid-template-rows: 35px 1fr; }
+.editor.agent-active #codeEditor, .editor.agent-active .editor-status { display: none; }
+.agent-panel { position: absolute; inset: 0; overflow: hidden; background: #141619; color: #d7d9dc; }
+.agent-panel[hidden] { display: none; }
+.agent-header { height: 58px; display: flex; align-items: center; justify-content: space-between; padding: 0 15px; border-bottom: 1px solid #2d3035; background: #191b1f; }
+.agent-header > div:first-child > span, .agent-sidebar section > span, .agent-api-drawer header span { color: #747a82; font: 7px "DM Mono"; letter-spacing: .14em; }
+.agent-header h2 { margin: 3px 0 0; font-size: 14px; font-weight: 600; }
+.agent-connection { display: grid; grid-template-columns: 7px auto; align-items: center; column-gap: 6px; }
+.agent-connection i { width: 6px; height: 6px; border-radius: 50%; background: #777d84; }
+.agent-connection b { color: #afb3b8; font-size: 9px; font-weight: 600; }
+.agent-connection span { grid-column: 2; margin-top: 2px; color: #6f747b; font-size: 7px; }
+.agent-layout { height: calc(100% - 58px); display: grid; grid-template-columns: minmax(0,1fr) 166px; }
+.agent-main { min-width: 0; display: grid; grid-template-rows: minmax(0,1fr) auto auto; border-right: 1px solid #2d3035; }
+.agent-thread { min-height: 0; overflow: auto; padding: 16px; scrollbar-width: thin; scrollbar-color: #4b5057 transparent; }
+.agent-message { max-width: 94%; margin: 0 0 13px; }
+.agent-message > span { display: block; margin-bottom: 5px; color: #777d84; font: 7px "DM Mono"; letter-spacing: .11em; }
+.agent-message p { margin: 0; padding: 9px 10px; border: 1px solid #30343a; border-radius: 5px; background: #1c1f23; color: #b8bcc2; font-size: 10px; line-height: 1.55; }
+.agent-message.user { margin-left: auto; }
+.agent-message.user > span { color: #b67b60; text-align: right; }
+.agent-message.user p { border-color: #533326; background: #2a211d; color: #e1d4cd; }
+.agent-message.system p { border-style: dashed; background: transparent; color: #858a92; }
+.agent-suggestions { display: flex; gap: 5px; padding: 0 12px 8px; overflow-x: auto; scrollbar-width: none; }
+.agent-suggestions button { flex: 0 0 auto; height: 25px; padding: 0 8px; border: 1px solid #34383e; border-radius: 13px; color: #8f949b; font-size: 8px; }
+.agent-suggestions button:hover { border-color: #ff6b2c77; color: #d5d7da; }
+.agent-composer { margin: 0 12px 12px; border: 1px solid #3a3e44; border-radius: 5px; background: #1b1d21; box-shadow: 0 8px 22px #0004; }
+.agent-composer:focus-within { border-color: #ff6b2c88; }
+.agent-composer textarea { width: 100%; min-height: 63px; resize: none; border: 0; outline: 0; padding: 10px; background: transparent; color: #e2e3e5; font: 10px/1.5 Manrope, sans-serif; }
+.agent-composer textarea::placeholder { color: #666c73; }
+.agent-composer footer { display: flex; align-items: center; justify-content: space-between; padding: 7px; border-top: 1px solid #2c2f34; }
+.agent-context { min-width: 0; overflow: hidden; color: #666c73; font: 7px "DM Mono"; text-overflow: ellipsis; white-space: nowrap; }
+.agent-composer .primary { flex: 0 0 auto; height: 26px; margin-left: 8px; padding: 0 10px; border-radius: 3px; background: var(--orange); color: #23150f; font-size: 8px; font-weight: 700; }
+.agent-sidebar { min-width: 0; overflow: auto; background: #17191c; }
+.agent-sidebar section { padding: 14px 12px; border-bottom: 1px solid #292c31; }
+.agent-sidebar h3 { margin: 7px 0 5px; font-size: 10px; font-weight: 600; }
+.agent-sidebar p { margin: 0; color: #7d8289; font-size: 8px; line-height: 1.55; }
+.agent-sidebar button { width: 100%; min-height: 27px; margin-top: 10px; padding: 5px 7px; border: 1px solid #383c42; border-radius: 3px; color: #a5aab0; font-size: 8px; }
+.agent-sidebar button:hover { border-color: #ff6b2c77; color: white; }
+.agent-api-drawer { position: absolute; inset: 10px; z-index: 4; overflow: auto; border: 1px solid #3b3f45; border-radius: 6px; background: #191b1fee; box-shadow: 0 20px 60px #000b; backdrop-filter: blur(8px); }
+.agent-api-drawer[hidden] { display: none; }
+.agent-api-drawer > header { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid #30343a; }
+.agent-api-drawer h3 { margin: 4px 0 0; font: 10px "DM Mono"; }
+.agent-api-drawer header button { width: 27px; height: 27px; border-radius: 3px; color: #888e95; font-size: 17px; }
+.agent-api-drawer header button:hover { background: #2b2e33; color: white; }
+.agent-api-list { padding: 5px 12px 12px; }
+.agent-api-list article { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 10px; padding: 9px 2px; border-bottom: 1px solid #292c31; }
+.agent-api-list code { color: #d9dadd; font: 9px "DM Mono"; }
+.agent-api-list p { margin: 4px 0 0; color: #777d84; font-size: 8px; }
+.agent-api-list b { padding: 3px 5px; border: 1px solid #3a3e44; border-radius: 3px; color: #8c9299; font: 7px "DM Mono"; font-weight: 500; text-transform: uppercase; }
+.agent-api-list .risk-write, .agent-api-list .risk-run { border-color: #6a3c2a; color: #e6936b; }
 
 /* Activity rail: current tools plus a visible roadmap for future workspace views. */
 .activity { padding-block: 5px; }
@@ -286,7 +341,6 @@
 .activity button { display: grid; place-items: center; height: 39px; font-size: 17px; }
 .activity button.planned { cursor: default; opacity: .42; }
 .activity button.planned:hover { color: #747980; }
-.activity button.agent-view { color: #a77c69; }
 
 /* Preview state and transport */
 .live-status.paused { color: #ffbf72 !important; }
