@@ -1,0 +1,44 @@
+{
+  "id": "b4d0ea93-9ec6-4715-97c9-b8f343b31c42",
+  "name": "Neon Breakout",
+  "createdAt": "2026-11-07T18:19:03.000Z",
+  "updatedAt": "2026-11-08T02:44:50.441Z",
+  "files": [
+    {
+      "id": "neon-simulation",
+      "path": "simulation.js",
+      "kind": "code"
+    },
+    {
+      "id": "neon-bot",
+      "path": "bot.js",
+      "kind": "code"
+    }
+  ],
+  "folders": [
+    "assets"
+  ],
+  "activeFileId": "neon-bot",
+  "openFileIds": [
+    "neon-simulation",
+    "neon-bot"
+  ],
+  "parameterValues": {},
+  "gridVisible": true,
+  "worldWidth": 720,
+  "worldHeight": 960,
+  "exportHistory": [
+    {
+      "id": "5b006f94-6b72-49b4-b212-4a910bd5c5ec",
+      "name": "loop-lab-2026-11-08.webm",
+      "createdAt": "2026-11-08T02:44:50.441Z",
+      "bytes": 238103,
+      "width": 540,
+      "height": 720,
+      "fps": 30,
+      "duration": 4
+    }
+  ],
+  "format": "loop-lab-project-directory",
+  "version": 1
+}

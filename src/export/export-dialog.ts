@@ -4,6 +4,7 @@ import { buildExportPlan, coerceParameterValue, randomizeParameters, type Export
 import type { ExportWorkerResponse } from './export-protocol';
 import type { ExportHistoryEntry } from '../project-store';
 import { AudioEngine } from '../audio-engine';
+import { inspectExportAutomation } from './export-automation';
 
 export interface ExportSource {
   code: string;
@@ -144,7 +145,8 @@ export class ExportDialog {
     this.renderParameters();
     this.renderHistory();
     this.updateSummary();
-    this.setStatus('Ready to render on this device.');
+    const automation = inspectExportAutomation(this.source.files);
+    this.setStatus(automation.error || (automation.interactive ? 'bot.js will provide deterministic input during export.' : 'Ready to render on this device.'), Boolean(automation.error));
     this.progress.hidden = true;
     this.progress.querySelector('i')?.setAttribute('style', 'width: 0%');
     this.exportButton.innerHTML = '<span>▶</span> Export WebM';
@@ -258,6 +260,8 @@ export class ExportDialog {
 
   private async startExport(): Promise<void> {
     if (!this.source || this.rendering) return;
+    const automation = inspectExportAutomation(this.source.files);
+    if (automation.error) { this.setStatus(automation.error, true); return; }
     const mimeType = preferredMimeType();
     if (!mimeType || !HTMLCanvasElement.prototype.captureStream) {
       this.setStatus('This browser cannot create local WebM exports.', true);

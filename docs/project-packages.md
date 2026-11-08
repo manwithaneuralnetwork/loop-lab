@@ -1,6 +1,20 @@
 # Project storage and `.looplab` packages
 
-Loop Lab stores the active project in the browser’s IndexedDB database. This includes code, folders, imported asset data, open tabs, parameter overrides, world dimensions, and export history. Existing `localStorage` projects are migrated automatically when no IndexedDB project exists.
+Loop Lab stores production/browser projects in IndexedDB. This includes code, folders, imported asset data, open tabs, parameter overrides, world dimensions, and export history. Existing `localStorage` projects are migrated automatically when no IndexedDB project exists.
+
+## Development project directories
+
+During local Vite development, projects under `projects/<slug>/` are the source of truth. Each directory contains a versioned `project.json` manifest, ordinary source files, and ordinary binary assets. The browser hydrates its IndexedDB cache from these directories at startup and writes browser edits back through the development server.
+
+```text
+projects/neon-breakout/
+  project.json
+  simulation.js
+  bot.js
+  assets/
+```
+
+The manifest uses the same `ProjectState` record as IndexedDB and `.looplab` packages, while file contents remain outside the record. A future database adapter can store the manifest as a project row and source/assets as related records or object storage without changing workspace code or runtime messages.
 
 ## Recovery
 

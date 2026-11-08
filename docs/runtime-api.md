@@ -36,6 +36,27 @@ export function update(world) {
 
 `world.elapsed` and `world.frame` are available when time is part of that condition, but a `duration` parameter has no special engine behavior. Video export has a separate maximum-length safety ceiling and stops earlier when `world.finish()` is called.
 
+## Export bots
+
+Interactive projects that read `world.input` must include a root `bot.js` before video export is allowed. During export, its `update(world, dt, params)` runs before the simulation update on every fixed step. Preview remains human-controlled.
+
+Games should expose a narrow automation boundary instead of asking bots to know internal object names:
+
+```js
+// simulation.js
+export function readBotState(world) { return { ballX: world.game.ball.position.x }; }
+export function applyBotInput(world, input) { world.game.botPaddleX = input.paddleX; }
+
+// bot.js
+import { readBotState, applyBotInput } from "./simulation.js";
+export function update(world) {
+  const state = readBotState(world);
+  applyBotInput(world, { paddleX: state.ballX });
+}
+```
+
+This keeps exported video deterministic and makes the bot reusable by later replay, testing, and evaluation tools.
+
 ## World
 
 - `world.width`, `world.height`, and `world.bounds`

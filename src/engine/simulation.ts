@@ -25,6 +25,8 @@ export class SimulationRuntime {
   private entry = 'simulation.js';
   private assets: Record<string, string> = {};
   private hooks: SimulationHooks = { parameters: {}, setup: null, update: null };
+  private botHooks: SimulationHooks | null = null;
+  private botEntry: string | null = null;
 
   constructor(width: number, height: number, stepSize = 1 / 60) {
     this.width = width;
@@ -37,11 +39,12 @@ export class SimulationRuntime {
     this.loadProject({ 'simulation.js': source }, 'simulation.js', overrides);
   }
 
-  loadProject(sources: ProjectSources, entry = 'simulation.js', overrides: ParameterValues = {}, assets: Record<string, string> = {}): void {
+  loadProject(sources: ProjectSources, entry = 'simulation.js', overrides: ParameterValues = {}, assets: Record<string, string> = {}, botEntry: string | null = null): void {
     this.source = sources[entry] || '';
     this.sources = { ...sources };
     this.entry = entry;
     this.assets = { ...assets };
+    this.botEntry = botEntry;
     const discoveryWorld = new World(this.width, this.height, 1, this.assets);
     const discovered = compileProject(this.sources, this.entry, discoveryWorld, {});
     this.schema = discovered.parameters || {};
@@ -50,10 +53,12 @@ export class SimulationRuntime {
     this.frame = 0;
     this.world = new World(this.width, this.height, Number(this.params.seed) || 1, this.assets);
     this.hooks = compileProject(this.sources, this.entry, this.world, this.params);
+    this.botHooks = this.botEntry && this.sources[this.botEntry]
+      ? compileProject(this.sources, this.botEntry, this.world, this.params) : null;
     this.hooks.setup?.(this.world, this.params);
   }
 
-  restart(): void { this.loadProject(this.sources, this.entry, this.params, this.assets); }
+  restart(): void { this.loadProject(this.sources, this.entry, this.params, this.assets, this.botEntry); }
 
   updateParameters(values: ParameterValues): void {
     this.params = { ...this.params, ...values };
@@ -73,6 +78,7 @@ export class SimulationRuntime {
 
   step(): void {
     if (this.world.finished) return;
+    this.botHooks?.update?.(this.world, this.stepSize, this.params);
     this.hooks.update?.(this.world, this.stepSize, this.params);
     this.world.advance(this.stepSize);
     this.elapsed += this.stepSize;

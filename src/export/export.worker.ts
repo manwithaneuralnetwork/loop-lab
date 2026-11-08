@@ -36,7 +36,10 @@ scope.onmessage = (event: MessageEvent<ExportWorkerRequest>) => {
     const message = event.data;
     if (message.type === 'start') {
       runtime = new SimulationRuntime(message.worldWidth, message.worldHeight);
-      if (message.files) runtime.loadProject(message.files, message.entry || 'simulation.js', message.params, message.assets);
+      if (message.files) runtime.loadProject(
+        message.files, message.entry || 'simulation.js', message.params, message.assets,
+        message.files['bot.js'] ? 'bot.js' : null
+      );
       else runtime.load(message.code, message.params);
       canvas = new OffscreenCanvas(message.outputWidth, message.outputHeight);
       renderer = new CanvasRenderer(canvas);

@@ -103,6 +103,31 @@ async function setActive(database: IDBDatabase, id: string): Promise<void> {
 async function putCheckpoint(database: IDBDatabase, checkpoint: ProjectCheckpoint): Promise<void> {
   await requestValue(database.transaction('checkpoints', 'readwrite').objectStore('checkpoints').put(checkpoint));
 }
+
+async function persistDevelopmentProject(project: ProjectState): Promise<void> {
+  if (!import.meta.env.DEV) return;
+  const response = await fetch('/__loop/projects', {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(project)
+  });
+  if (!response.ok) throw new Error((await response.json() as { error?: string }).error || 'Could not write the development project.');
+}
+
+export async function syncDevelopmentProjects(): Promise<void> {
+  if (!import.meta.env.DEV) return;
+  try {
+    const response = await fetch('/__loop/projects'); if (!response.ok) return;
+    const diskProjects = await response.json() as ProjectState[]; if (!diskProjects.length) return;
+    const database = await openDatabase();
+    const cached = await requestValue(database.transaction('projects', 'readonly').objectStore('projects').getAll()) as LegacyProjectState[];
+    for (const project of diskProjects) {
+      const sameName = cached.find((candidate) => candidate.name?.toLowerCase() === project.name.toLowerCase());
+      const normalized = normalizeProject(project, '');
+      if (sameName?.id) normalized.id = sameName.id;
+      await putProject(database, normalized);
+    }
+    database.close();
+  } catch { /* IndexedDB remains available when the development adapter is offline. */ }
+}
 async function migrateLegacy(database: IDBDatabase, fallbackCode: string): Promise<ProjectState | null> {
   const legacy = await getProject(database, LEGACY_PROJECT_KEY); if (!legacy) return null;
   const project = normalizeProject(legacy, fallbackCode); await putProject(database, project); await setActive(database, project.id);
@@ -141,10 +166,12 @@ export async function saveProject(project: ProjectState, createRecovery = true):
     await putProject(database, project); await setActive(database, project.id); database.close();
     if (createRecovery) await pruneCheckpoints(project.id);
   } catch { localStorage.setItem(STORAGE_KEY, JSON.stringify(project)); }
+  await persistDevelopmentProject(project);
 }
 
 export async function storeProject(project: ProjectState, activate = true): Promise<void> {
   const database = await openDatabase(); await putProject(database, project); if (activate) await setActive(database, project.id); database.close();
+  await persistDevelopmentProject(project);
 }
 export async function listProjects(): Promise<ProjectState[]> {
   try {

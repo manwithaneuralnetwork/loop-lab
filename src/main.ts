@@ -3,7 +3,7 @@ import './refinements.css';
 import { createCodeEditor } from './code-editor';
 import type { ParameterDefinition, ParameterSchema, ParameterValue, ParameterValues, RuntimeToHostMessage } from './engine/protocol';
 import { isParameterDefinition } from './engine/parameters';
-import { loadProject, saveProject, type ProjectFile } from './project-store';
+import { loadProject, saveProject, syncDevelopmentProjects, type ProjectFile } from './project-store';
 import { RuntimeBridge } from './runtime-bridge';
 import { BOUNCING_BALLS_CODE, BOUNCING_BALLS_HELPERS } from './samples/bouncing-balls';
 import { ExportDialog } from './export/export-dialog';
@@ -17,6 +17,7 @@ function query<T extends Element>(selector: string): T {
   return element;
 }
 
+await syncDevelopmentProjects();
 const project = await loadProject(BOUNCING_BALLS_CODE, [{ path: 'helpers.js', content: BOUNCING_BALLS_HELPERS }]);
 const activeAtStart = project.files.find((file) => file.id === project.activeFileId && file.kind === 'code') || project.files[0];
 const editorBody = query<HTMLElement>('.editor-body');

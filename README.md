@@ -11,7 +11,7 @@ The implementation is split into typed boundaries:
 - `src/main.ts` coordinates workspace UI state without owning engine behavior.
 - `src/project-store.ts`, `src/code-editor.ts`, and `src/samples/` keep storage, editing, and starter code independent.
 
-Video export is local-only in this version. The export dialog snapshots the current code and parameter values, supports per-export overrides and randomized creative parameters, and renders deterministic WebM video with project audio in a separate worker. Output can use 24, 30, or 60 fps with 720p, 1080p, or original-size bounds; no project or cloud data is involved.
+Video export is local-only in this version. The export dialog snapshots the current code and parameter values, supports per-export overrides and randomized creative parameters, and renders deterministic WebM video with project audio in a separate worker. Interactive projects must provide `bot.js`; export runs the bot before each simulation step so recorded input is deterministic. Output can use 24, 30, or 60 fps with 720p, 1080p, or original-size bounds; no project or cloud data is involved.
 
 The workspace now has a multi-project dashboard with creation, three starter templates, duplication, and project switching. Each project persists multiple code files, folders, imported assets, open tabs, and export history. `simulation.js` is the protected runtime entry file, and relative modules can import one another with standard JavaScript syntax. The editor provides Loop Lab API completion, hover documentation, project-aware diagnostics, and search. Preview controls support deterministic seeking, 0.25×–4× playback, stepping, pointer/keyboard input, runtime status, fullscreen presentation, limited master audio, and a live one-second performance profile. The engine now renders circles, rectangles, text, and imported-image sprites, with code-defined completion conditions, stable object identities, lifecycle helpers, render layers, a camera, spatial queries, boundary and object-contact events, lightweight circle/rectangle collision response, and Web Audio playback for imported sounds. WebM exports offer naming, a separate maximum-length safety ceiling, early completion through `world.finish()`, 720p/1080p/original bounds, 24/30/60 fps, audio and asset preloading, progress/ETA, and cancellation. See [`docs/runtime-api.md`](docs/runtime-api.md) for the programming model.
 
@@ -24,6 +24,8 @@ Loop Lab currently uses its own small Canvas 2D renderer. **PixiJS is not planne
 ## Project durability
 
 Projects are saved in IndexedDB rather than browser key/value storage, allowing substantially larger imported assets. Autosave keeps up to ten rotating recovery checkpoints, and users can create explicit checkpoints from the Explorer menu. Complete projects can be downloaded and reopened as readable, versioned `.looplab` JSON packages. See [`docs/project-packages.md`](docs/project-packages.md).
+
+Local development additionally uses versioned project directories under `projects/`. Their manifests share the browser project schema while code and assets remain ordinary files, making projects easy to edit, test, commit, and later migrate to a database-backed repository.
 
 ## Runtime safety
 

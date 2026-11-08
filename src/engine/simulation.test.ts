@@ -77,4 +77,24 @@ describe('SimulationRuntime', () => {
     expect(runtime.world.finishReason).toBe('Target reached');
     expect(runtime.elapsed).toBe(0.75);
   });
+
+  it('runs an export bot before the simulation update', () => {
+    const runtime = new SimulationRuntime(200, 100, 0.25);
+    runtime.loadProject({
+      'simulation.js': `
+        export function setup(world) { world.control = 0; world.circle({ x: 0 }); }
+        export function readState(world) { return world.objects[0].position.x; }
+        export function applyInput(world, value) { world.control = value; }
+        export function update(world) { world.objects[0].position.x += world.control; }
+      `,
+      'bot.js': `
+        import { readState, applyInput } from './simulation.js';
+        export function update(world) { applyInput(world, readState(world) + 2); }
+      `
+    }, 'simulation.js', {}, {}, 'bot.js');
+    runtime.step();
+    expect(runtime.world.objects[0].position.x).toBe(2);
+    runtime.step();
+    expect(runtime.world.objects[0].position.x).toBe(6);
+  });
 });
