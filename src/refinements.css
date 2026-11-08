@@ -299,9 +299,9 @@
 .agent-connection.offline i { background: #d28a5d; }
 .agent-connection b { color: #afb3b8; font-size: 9px; font-weight: 600; }
 .agent-connection span { grid-column: 2; margin-top: 2px; color: #6f747b; font-size: 7px; }
-.agent-layout { height: calc(100% - 58px); display: grid; grid-template-columns: minmax(0,1fr) 166px; }
-.agent-main { min-width: 0; display: grid; grid-template-rows: minmax(0,1fr) auto auto; border-right: 1px solid #2d3035; }
-.agent-thread { min-height: 0; overflow: auto; padding: 16px; scrollbar-width: thin; scrollbar-color: #4b5057 transparent; }
+.agent-layout { height: calc(100% - 58px); min-height: 0; display: grid; grid-template-columns: minmax(0,1fr) 166px; overflow: hidden; }
+.agent-main { min-width: 0; min-height: 0; display: grid; grid-template-rows: minmax(0,1fr) auto auto; overflow: hidden; border-right: 1px solid #2d3035; }
+.agent-thread { min-height: 0; height: 100%; overflow: auto; overscroll-behavior: contain; padding: 16px; scrollbar-width: thin; scrollbar-color: #4b5057 transparent; }
 .agent-message { max-width: 94%; margin: 0 0 13px; }
 .agent-message > span { display: block; margin-bottom: 5px; color: #777d84; font: 7px "DM Mono"; letter-spacing: .11em; }
 .agent-message p { margin: 0; padding: 9px 10px; border: 1px solid #30343a; border-radius: 5px; background: #1c1f23; color: #b8bcc2; font-size: 10px; line-height: 1.55; }
