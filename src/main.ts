@@ -55,6 +55,7 @@ let isPlaying = true;
 let isScrubbing = false;
 let suppressEditorChange = false;
 let errors = 0;
+let navigatingToProject = false;
 
 function entryFile(): ProjectFile {
   return project.files.find((file) => file.path === 'simulation.js') || project.files.find((file) => file.kind === 'code')!;
@@ -108,7 +109,10 @@ workspaceFiles = new WorkspaceFiles(project, {
   onNotice: (message) => addLog(message)
 });
 new ProjectActions(project, workspaceFiles, { onNotice: (message) => addLog(message) });
-const dashboard = new ProjectDashboard(project, { onNotice: (message) => addLog(message, 'ok') });
+const dashboard = new ProjectDashboard(project, {
+  onNotice: (message) => addLog(message, 'ok'),
+  onNavigate: () => { navigatingToProject = true; if (saveTimer) clearTimeout(saveTimer); }
+});
 query<HTMLButtonElement>('.projects-link').addEventListener('click', () => void dashboard.open());
 query<HTMLButtonElement>('.project-back').addEventListener('click', () => void dashboard.open());
 setSaveState(true);
@@ -277,4 +281,4 @@ let dimensionTimer: ReturnType<typeof setTimeout> | null = null;
 function scheduleDimensionUpdate(): void { if (dimensionTimer) clearTimeout(dimensionTimer); dimensionTimer = setTimeout(updateDimensions, 250); }
 worldWidthInput.addEventListener('input', scheduleDimensionUpdate); worldHeightInput.addEventListener('input', scheduleDimensionUpdate);
 
-window.addEventListener('beforeunload', () => { void persistProject(); runtime.destroy(); editor.destroy(); });
+window.addEventListener('beforeunload', () => { if (!navigatingToProject) void persistProject(); runtime.destroy(); editor.destroy(); });

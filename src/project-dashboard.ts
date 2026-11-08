@@ -1,7 +1,7 @@
 import { activateProject, duplicateProject, listProjects, storeProject, type ProjectState } from './project-store';
 import { PROJECT_TEMPLATES, type ProjectTemplate } from './project-templates';
 
-interface DashboardOptions { onNotice(message: string): void }
+interface DashboardOptions { onNotice(message: string): void; onNavigate(): void }
 
 export class ProjectDashboard {
   private readonly root = document.createElement('section');
@@ -47,7 +47,10 @@ export class ProjectDashboard {
     }
   }
 
-  private async openProject(id: string): Promise<void> { if (id === this.active.id) { this.close(); return; } await activateProject(id); window.location.reload(); }
+  private async openProject(id: string): Promise<void> {
+    if (id === this.active.id) { this.close(); return; }
+    this.options.onNavigate(); await activateProject(id); window.location.reload();
+  }
   private async duplicate(project: ProjectState): Promise<void> {
     const copy = await duplicateProject(project); this.projects = await listProjects(); this.renderProjects(); this.options.onNotice(`Duplicated ${project.name} as ${copy.name}.`);
   }
@@ -61,6 +64,6 @@ export class ProjectDashboard {
   }
 
   private async create(template: ProjectTemplate, name: string): Promise<void> {
-    const project = template.create(name.trim() || 'Untitled Project'); await storeProject(project, true); window.location.reload();
+    const project = template.create(name.trim() || 'Untitled Project'); this.options.onNavigate(); await storeProject(project, true); window.location.reload();
   }
 }
