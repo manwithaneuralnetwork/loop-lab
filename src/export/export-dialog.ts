@@ -20,6 +20,15 @@ export interface ExportSource {
 
 type SourceProvider = () => ExportSource;
 
+interface PreflightResult {
+  finished: boolean;
+  duration: number;
+  frames: number;
+  reason: string;
+  wallMs: number;
+  timedOut?: boolean;
+}
+
 function displayName(key: string): string {
   return key.replace(/([A-Z])/g, ' $1').replace(/^./, (letter) => letter.toUpperCase());
 }
@@ -53,7 +62,9 @@ export class ExportDialog {
   private readonly resolutionSelect: HTMLSelectElement;
   private readonly fpsSelect: HTMLSelectElement;
   private readonly nameInput: HTMLInputElement;
-  private readonly history: HTMLDivElement;
+  private readonly historyButton: HTMLButtonElement;
+  private readonly historyBackdrop: HTMLDivElement;
+  private readonly historyList: HTMLDivElement;
   private source: ExportSource | null = null;
   private values: ParameterValues = {};
   private worker: Worker | null = null;
@@ -66,6 +77,10 @@ export class ExportDialog {
   private frameWatchdog: number | null = null;
   private renderStartedAt = 0;
   private exportAudio: AudioEngine | null = null;
+  private preflightWorker: Worker | null = null;
+  private preflightTimer: number | null = null;
+  private preflightRun = 0;
+  private preflightResult: PreflightResult | null = null;
 
   constructor(
     openButton: HTMLButtonElement,
@@ -94,17 +109,28 @@ export class ExportDialog {
         </div>
         <div class="export-parameter-header"><strong>Render parameters</strong><span>Snapshot only — your workspace stays unchanged</span></div>
         <div class="export-parameters"></div>
-        <div class="export-history"></div>
         <div class="export-progress" hidden><i></i></div>
         <p class="export-status" aria-live="polite"></p>
         <footer>
           <button class="export-random secondary" type="button"><span>✦</span> Randomize</button>
+          <button class="export-history-open secondary" type="button">History</button>
           <div></div>
           <button class="export-cancel secondary" type="button">Cancel</button>
           <button class="export-start primary" type="button"><span>▶</span> Export WebM</button>
         </footer>
       </section>`;
     document.body.append(this.backdrop);
+
+    this.historyBackdrop = document.createElement('div');
+    this.historyBackdrop.className = 'export-history-backdrop';
+    this.historyBackdrop.hidden = true;
+    this.historyBackdrop.innerHTML = `
+      <section class="export-history-dialog" role="dialog" aria-modal="true" aria-labelledby="exportHistoryTitle">
+        <header><div><span class="export-kicker">LOCAL RECORD</span><h2 id="exportHistoryTitle">Export history</h2></div><button type="button" aria-label="Close export history">×</button></header>
+        <div class="export-history-list"></div>
+        <footer><span>Saved metadata for this project</span><button class="secondary" type="button">Close</button></footer>
+      </section>`;
+    document.body.append(this.historyBackdrop);
 
     this.parameters = this.backdrop.querySelector('.export-parameters') as HTMLDivElement;
     this.summary = this.backdrop.querySelector('.export-summary') as HTMLParagraphElement;
@@ -117,44 +143,55 @@ export class ExportDialog {
     this.resolutionSelect = this.backdrop.querySelector('.export-resolution') as HTMLSelectElement;
     this.fpsSelect = this.backdrop.querySelector('.export-fps') as HTMLSelectElement;
     this.nameInput = this.backdrop.querySelector('.export-name') as HTMLInputElement;
-    this.history = this.backdrop.querySelector('.export-history') as HTMLDivElement;
+    this.historyButton = this.backdrop.querySelector('.export-history-open') as HTMLButtonElement;
+    this.historyList = this.historyBackdrop.querySelector('.export-history-list') as HTMLDivElement;
 
     openButton.addEventListener('click', () => this.open());
     this.closeButton.addEventListener('click', () => this.close());
     this.cancelButton.addEventListener('click', () => this.rendering ? this.cancelRender() : this.close());
     this.randomButton.addEventListener('click', () => this.randomize());
     this.exportButton.addEventListener('click', () => void this.startExport());
-    this.resolutionSelect.addEventListener('change', () => this.updateSummary());
-    this.fpsSelect.addEventListener('change', () => this.updateSummary());
+    this.resolutionSelect.addEventListener('change', () => { this.updateSummary(); this.schedulePreflight(); });
+    this.fpsSelect.addEventListener('change', () => { this.updateSummary(); this.schedulePreflight(); });
+    this.historyButton.addEventListener('click', () => this.openHistory());
+    this.historyBackdrop.querySelectorAll('button').forEach((button) => button.addEventListener('click', () => { this.historyBackdrop.hidden = true; }));
+    this.historyBackdrop.addEventListener('click', (event) => { if (event.target === this.historyBackdrop) this.historyBackdrop.hidden = true; });
     this.backdrop.addEventListener('click', (event) => {
       if (event.target === this.backdrop && !this.rendering) this.close();
     });
     window.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape' && !this.backdrop.hidden && !this.rendering) this.close();
+      if (event.key !== 'Escape') return;
+      if (!this.historyBackdrop.hidden) this.historyBackdrop.hidden = true;
+      else if (!this.backdrop.hidden && !this.rendering) this.close();
     });
   }
 
   private open(): void {
     this.source = this.getSource();
     this.values = { ...this.source.params };
+    this.preflightResult = null;
     const derived = this.backdrop.querySelector<HTMLElement>('.export-derived-duration');
-    if (derived) derived.textContent = 'Preflight';
+    if (derived) derived.textContent = 'Checking…';
     this.nameInput.value = `loop-lab-${new Date().toISOString().slice(0, 10)}`;
     this.renderParameters();
     this.renderHistory();
     this.updateSummary();
     const automation = inspectExportAutomation(this.source.files);
-    this.setStatus(automation.error || (automation.interactive ? 'bot.js will provide deterministic input during export.' : 'Ready to render on this device.'), Boolean(automation.error));
+    this.setStatus(automation.error || 'Estimating duration without graphics…', Boolean(automation.error));
     this.progress.hidden = true;
     this.progress.querySelector('i')?.setAttribute('style', 'width: 0%');
     this.exportButton.innerHTML = '<span>▶</span> Export WebM';
     this.backdrop.hidden = false;
     document.body.classList.add('export-open');
     this.closeButton.focus();
+    if (!automation.error) this.schedulePreflight(0);
+    else this.exportButton.disabled = true;
   }
 
   private close(): void {
     if (this.rendering) return;
+    this.cancelPreflight();
+    this.historyBackdrop.hidden = true;
     this.backdrop.hidden = true;
     document.body.classList.remove('export-open');
   }
@@ -168,19 +205,33 @@ export class ExportDialog {
   }
 
   private renderHistory(): void {
-    if (!this.source?.history.length) { this.history.innerHTML = ''; return; }
-    this.history.innerHTML = '<h3>RECENT EXPORTS</h3>';
-    this.source.history.slice(0, 3).forEach((entry) => {
-      const row = document.createElement('p');
-      row.innerHTML = `<strong>${entry.name}</strong><span>${entry.width}×${entry.height} · ${entry.fps} fps · ${formatFileSize(entry.bytes)}</span>`;
-      this.history.append(row);
+    this.historyList.innerHTML = '';
+    if (!this.source?.history.length) {
+      this.historyList.innerHTML = '<p class="export-history-empty">No exports recorded for this project yet.</p>';
+      return;
+    }
+    this.source.history.forEach((entry) => {
+      const row = document.createElement('article');
+      const date = new Date(entry.createdAt);
+      row.innerHTML = `<div><strong>${entry.name}</strong><time>${Number.isNaN(date.getTime()) ? '' : date.toLocaleString()}</time></div><span>${entry.width}×${entry.height}<b>${entry.fps} fps</b><b>${entry.duration.toFixed(2)} sec</b><b>${formatFileSize(entry.bytes)}</b></span>`;
+      this.historyList.append(row);
     });
+  }
+
+  private openHistory(): void {
+    this.renderHistory();
+    this.historyBackdrop.hidden = false;
+    (this.historyBackdrop.querySelector('button') as HTMLButtonElement | null)?.focus();
   }
 
   private updateSummary(): void {
     const plan = this.plan();
     const audio = this.source && Object.values(this.source.assets).some((asset) => asset.startsWith('data:audio/')) ? '  ·  audio' : '';
-    this.summary.textContent = `${plan.width} × ${plan.height}  ·  ${plan.fps} fps  ·  duration found before render${audio}`;
+    const duration = !this.preflightResult ? 'checking duration'
+      : this.preflightResult.timedOut ? 'CPU limit reached'
+      : this.preflightResult.finished ? `${this.preflightResult.duration.toFixed(2)} sec`
+      : '> 60 sec';
+    this.summary.textContent = `${plan.width} × ${plan.height}  ·  ${plan.fps} fps  ·  ${duration}${audio}`;
   }
 
   private renderParameters(): void {
@@ -214,6 +265,7 @@ export class ExportDialog {
             this.values[key] = !this.values[key];
             toggle.classList.toggle('active', Boolean(this.values[key]));
             toggle.setAttribute('aria-checked', String(Boolean(this.values[key])));
+            this.schedulePreflight();
           });
           label.append(toggle);
         } else {
@@ -225,6 +277,7 @@ export class ExportDialog {
           if (definition.step != null) input.step = String(definition.step);
           input.addEventListener('input', () => {
             this.values[key] = coerceParameterValue(definition, input.value);
+            this.schedulePreflight();
           });
           label.append(input);
         }
@@ -239,7 +292,7 @@ export class ExportDialog {
     this.values = randomizeParameters(this.source.schema, this.values);
     this.renderParameters();
     this.updateSummary();
-    this.setStatus('Randomized creative parameters. Export duration will be measured again.');
+    this.schedulePreflight(0);
   }
 
   private setStatus(message: string, error = false): void {
@@ -247,10 +300,65 @@ export class ExportDialog {
     this.status.classList.toggle('error', error);
   }
 
+  private cancelPreflight(): void {
+    if (this.preflightTimer != null) window.clearTimeout(this.preflightTimer);
+    this.preflightTimer = null;
+    this.preflightWorker?.terminate();
+    this.preflightWorker = null;
+    this.preflightRun += 1;
+  }
+
+  private schedulePreflight(delay = 220): void {
+    if (!this.source || this.rendering) return;
+    this.cancelPreflight();
+    this.preflightResult = null;
+    const derived = this.backdrop.querySelector<HTMLElement>('.export-derived-duration');
+    if (derived) derived.textContent = 'Checking…';
+    this.exportButton.disabled = true;
+    this.updateSummary();
+    this.setStatus('Estimating duration without graphics…');
+    const run = this.preflightRun;
+    this.preflightTimer = window.setTimeout(() => void this.refreshPreflight(run), delay);
+  }
+
+  private async refreshPreflight(run: number): Promise<void> {
+    this.preflightTimer = null;
+    try {
+      const result = await this.runPreflight();
+      if (run !== this.preflightRun || this.rendering || this.backdrop.hidden) return;
+      this.preflightResult = result;
+      const derived = this.backdrop.querySelector<HTMLElement>('.export-derived-duration');
+      if (result.timedOut) {
+        if (derived) derived.textContent = 'CPU limit';
+        this.setStatus(`Preflight stopped after ${(result.wallMs / 1000).toFixed(2)} sec (CPU limit) · duration unavailable.`, true);
+      } else if (!result.finished) {
+        if (derived) derived.textContent = '> 60 sec';
+        this.setStatus(`Preflight took ${this.formatPreflightTime(result.wallMs)} · simulation did not finish within 60 simulated seconds.`, true);
+      } else {
+        if (derived) derived.textContent = `${result.duration.toFixed(2)} sec`;
+        const automation = this.source ? inspectExportAutomation(this.source.files) : { interactive: false };
+        const input = automation.interactive ? ' · bot.js input verified' : '';
+        this.setStatus(`Duration ready · preflight ${this.formatPreflightTime(result.wallMs)}${input}`);
+      }
+      this.updateSummary();
+      this.exportButton.disabled = !result.finished;
+    } catch (error) {
+      if (run !== this.preflightRun) return;
+      this.preflightResult = null;
+      this.setStatus(error instanceof Error ? error.message : String(error), true);
+      this.exportButton.disabled = true;
+    }
+  }
+
+  private formatPreflightTime(milliseconds: number): string {
+    return milliseconds < 1000 ? `${Math.round(milliseconds)} ms` : `${(milliseconds / 1000).toFixed(2)} sec`;
+  }
+
   private setRendering(rendering: boolean): void {
     this.rendering = rendering;
     this.randomButton.disabled = rendering;
-    this.exportButton.disabled = rendering;
+    this.historyButton.disabled = rendering;
+    this.exportButton.disabled = rendering || !this.preflightResult?.finished;
     this.closeButton.disabled = rendering;
     this.cancelButton.textContent = rendering ? 'Cancel render' : 'Close';
     this.exportButton.innerHTML = rendering ? '<span class="export-spinner"></span> Rendering…' : '<span>▶</span> Export again';
@@ -265,23 +373,25 @@ export class ExportDialog {
       this.setStatus('This browser cannot create local WebM exports.', true);
       return;
     }
+    const preflight = this.preflightResult;
+    if (!preflight?.finished) {
+      this.setStatus('Wait for a successful duration preflight before exporting.', true);
+      return;
+    }
 
     this.cancelled = false;
     this.setRendering(true);
     this.progress.hidden = false;
     this.progress.querySelector('i')?.setAttribute('style', 'width: 0%');
-    this.setStatus('Running simulation preflight without graphics…');
-    this.renderStartedAt = performance.now();
+    this.setStatus(`Preflight ${this.formatPreflightTime(preflight.wallMs)} · preparing local renderer…`);
 
     try {
-      const preflight = await this.runPreflight();
-      if (!preflight.finished) throw new Error('Export blocked: the simulation did not finish within the 60 second project limit. Add or fix a world.finish() condition.');
       const plan = this.plan(preflight.duration);
       const derived = this.backdrop.querySelector<HTMLElement>('.export-derived-duration');
       if (derived) derived.textContent = `${preflight.duration.toFixed(2)} sec`;
       const audioSummary = Object.values(this.source.assets).some((asset) => asset.startsWith('data:audio/')) ? ' · audio' : '';
       this.summary.textContent = `${plan.width} × ${plan.height} · ${plan.fps} fps · ${preflight.duration.toFixed(2)} sec${audioSummary}`;
-      this.setStatus(`Preflight complete in ${(performance.now() - this.renderStartedAt).toFixed(0)} ms · rendering ${plan.totalFrames.toLocaleString()} frames…`);
+      this.setStatus(`Preflight ${this.formatPreflightTime(preflight.wallMs)} · rendering ${plan.totalFrames.toLocaleString()} frames…`);
       this.renderStartedAt = performance.now();
       const canvas = document.createElement('canvas');
       canvas.className = 'export-capture-canvas';
@@ -390,21 +500,41 @@ export class ExportDialog {
     }
   }
 
-  private runPreflight(): Promise<{ finished: boolean; duration: number; frames: number; reason: string }> {
+  private runPreflight(): Promise<PreflightResult> {
     if (!this.source) return Promise.reject(new Error('No export source is available.'));
+    const startedAt = performance.now();
+    const values = { ...this.values };
     return new Promise((resolve, reject) => {
       const worker = new Worker(new URL('./export.worker.ts', import.meta.url), { type: 'module' });
-      this.worker = worker;
-      const timeout = window.setTimeout(() => { worker.terminate(); if (this.worker === worker) this.worker = null; reject(new Error('Export blocked: the headless preflight exceeded the 5 second CPU limit.')); }, 5000);
-      worker.onerror = (event) => { window.clearTimeout(timeout); worker.terminate(); if (this.worker === worker) this.worker = null; reject(new Error(event.message || 'Preflight failed.')); };
+      this.preflightWorker = worker;
+      const timeout = window.setTimeout(() => {
+        const wallMs = performance.now() - startedAt;
+        worker.terminate();
+        if (this.preflightWorker === worker) this.preflightWorker = null;
+        resolve({ finished: false, duration: 60, frames: 0, reason: 'CPU limit exceeded', wallMs, timedOut: true });
+      }, 5000);
+      worker.onerror = (event) => {
+        window.clearTimeout(timeout);
+        worker.terminate();
+        if (this.preflightWorker === worker) this.preflightWorker = null;
+        reject(new Error(`Preflight failed after ${this.formatPreflightTime(performance.now() - startedAt)}: ${event.message || 'worker error'}`));
+      };
       worker.onmessage = (event: MessageEvent<ExportWorkerResponse>) => {
-        if (event.data.type === 'error') { window.clearTimeout(timeout); worker.terminate(); if (this.worker === worker) this.worker = null; reject(new Error(event.data.message)); }
+        if (event.data.type === 'error') {
+          window.clearTimeout(timeout);
+          worker.terminate();
+          if (this.preflightWorker === worker) this.preflightWorker = null;
+          reject(new Error(`Preflight failed after ${this.formatPreflightTime(performance.now() - startedAt)}: ${event.data.message}`));
+        }
         if (event.data.type !== 'preflight') return;
-        window.clearTimeout(timeout); worker.terminate(); if (this.worker === worker) this.worker = null; resolve(event.data);
+        window.clearTimeout(timeout);
+        worker.terminate();
+        if (this.preflightWorker === worker) this.preflightWorker = null;
+        resolve({ ...event.data, wallMs: performance.now() - startedAt });
       };
       worker.postMessage({
         type: 'preflight', files: this.source!.files, assets: this.source!.assets, entry: this.source!.entry,
-        params: this.values, worldWidth: this.source!.worldWidth, worldHeight: this.source!.worldHeight, limitSeconds: 60
+        params: values, worldWidth: this.source!.worldWidth, worldHeight: this.source!.worldHeight, limitSeconds: 60
       });
     });
   }

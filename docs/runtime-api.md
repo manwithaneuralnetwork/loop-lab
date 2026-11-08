@@ -34,7 +34,7 @@ export function update(world) {
 }
 ```
 
-`world.elapsed` and `world.frame` are available when time is part of that condition, but a `duration` parameter has no special engine behavior. Before video encoding, export runs the project without drawing or audio to find the exact frame where `world.finish()` is called. A project that cannot finish within 60 simulated seconds is rejected rather than producing a truncated video.
+`world.elapsed` and `world.frame` are available when time is part of that condition, but a `duration` parameter has no special engine behavior. The export dialog runs the project without drawing or audio when it opens and after render settings change, then shows both the exact frame where `world.finish()` is called and the preflight's wall-clock cost. Edits are debounced and stale preflight workers are cancelled. A project that cannot finish within 60 simulated seconds is rejected rather than producing a truncated video.
 
 ## Export bots
 

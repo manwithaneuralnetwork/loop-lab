@@ -6,23 +6,43 @@ export function update(world) {
   const state = readBotState(world);
   if (!state || state.finished) return;
 
-  let paddleX = state.ball.x;
   let target = null;
   if (state.ball.vy > 0 && state.bricks.length) {
-    // Aim the next upward bounce at the lowest remaining brick. Moving the
-    // paddle's center changes the contact offset and therefore the exit angle.
-    target = state.bricks.reduce((best, brick) => {
-      if (!best || brick.y > best.y) return brick;
-      if (brick.y === best.y && Math.abs(brick.x - state.ball.x) < Math.abs(best.x - state.ball.x)) return brick;
-      return best;
-    }, null);
-    const travelTime = (state.world.height - target.y) / Math.max(1, Math.abs(state.ball.vy));
-    const desiredVx = Math.max(-560, Math.min(560, (target.x - state.ball.x) / Math.max(0.18, travelTime)));
-    const contactOffset = Math.max(-0.78, Math.min(0.78, desiredVx / 558));
-    paddleX = state.ball.x - contactOffset * state.paddle.width * 0.5;
+    if (state.bricks.length <= 6) {
+      // Endgame: deliberately pick off the closest surviving brick.
+      target = state.bricks.reduce((best, brick) => {
+        const distance = Math.hypot(brick.x - state.ball.x, brick.y - state.ball.y);
+        const bestDistance = best ? Math.hypot(best.x - state.ball.x, best.y - state.ball.y) : Infinity;
+        return distance < bestDistance ? brick : best;
+      }, null);
+    } else {
+      // Opening/midgame: shoot through the clearer side channel so the ball
+      // can travel behind the wall and clear several bricks from above.
+      const columnWidth = state.layout.brickWidth * 0.45;
+      const leftCount = state.bricks.filter((brick) => Math.abs(brick.x - state.layout.leftColumnX) < columnWidth).length;
+      const rightCount = state.bricks.filter((brick) => Math.abs(brick.x - state.layout.rightColumnX) < columnWidth).length;
+      const openSide = leftCount === 0 ? "left" : rightCount === 0 ? "right" : null;
+      if (openSide) {
+        const useLeft = openSide === "left";
+        const brickEdge = useLeft
+          ? state.layout.leftColumnX - state.layout.brickWidth / 2
+          : state.layout.rightColumnX + state.layout.brickWidth / 2;
+        target = {
+          x: useLeft ? brickEdge * 0.5 : state.world.width - (state.world.width - brickEdge) * 0.5,
+          y: 140
+        };
+      } else {
+        // Build toward a tunnel while keeping the reliable low-row clear.
+        target = state.bricks.reduce((best, brick) => {
+          if (!best || brick.y > best.y) return brick;
+          if (brick.y === best.y && Math.abs(brick.x - state.ball.x) < Math.abs(best.x - state.ball.x)) return brick;
+          return best;
+        }, null);
+      }
+    }
   }
   applyBotInput(world, {
-    paddleX,
+    paddleX: state.ball.x,
     aimX: target?.x,
     aimY: target?.y
   });

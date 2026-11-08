@@ -59,9 +59,11 @@ export function readBotState(world) {
     },
     paddle: { x: state.paddle.position.x, width: state.paddle.width },
     bricks: world.tagged("brick").map((brick) => ({
-      x: brick.position.x, y: brick.position.y
+      x: brick.position.x, y: brick.position.y,
+      width: brick.width, height: brick.height
     })),
     world: { width: world.width, height: world.height },
+    layout: state.layout,
     score: state.score, lives: state.lives, remaining: state.remaining, elapsed: world.elapsed,
     serving: state.serveFrames > 0, finished: state.finished
   };
@@ -124,7 +126,12 @@ export function setup(world, params) {
     score: 0, lives: params.lives, startingLives: params.lives, remaining,
     paddle, ball, scoreLabel, livesLabel, hint,
     serveFrames: 0, soundGate: 0, effects: [], finished: false,
-    botPaddleX: null, botAim: null
+    botPaddleX: null, botAim: null,
+    layout: {
+      leftColumnX: margin + brickWidth / 2,
+      rightColumnX: world.width - margin - brickWidth / 2,
+      brickWidth, brickHeight
+    }
   };
   resetBall(world, world.gameState, 70);
 }
