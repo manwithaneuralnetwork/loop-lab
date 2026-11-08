@@ -162,6 +162,7 @@ export function setup(world, params) {
     serveFrames: 0, soundGate: 0, effects: [], finished: false, endFrames: 0, endReason: "",
     botPaddleX: null, botAim: null,
     layout: {
+      top,
       leftColumnX: margin + brickWidth / 2,
       rightColumnX: world.width - margin - brickWidth / 2,
       brickWidth, brickHeight

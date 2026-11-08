@@ -3,7 +3,6 @@
 import { readBotState, applyBotInput } from "./simulation.js";
 
 let lockedTarget = null;
-let lastTargetX = null;
 
 function chooseCleanupTarget(state) {
   return state.bricks.reduce((best, brick) => {
@@ -13,30 +12,15 @@ function chooseCleanupTarget(state) {
   }, null);
 }
 
-function chooseStrategicTarget(state) {
-  const brickWidth = state.layout.brickWidth;
-  return state.bricks.reduce((best, brick) => {
-    const below = state.bricks.filter((other) =>
-      other.y > brick.y && Math.abs(other.x - brick.x) < brickWidth * 0.62
-    ).length;
-    const aboveInLane = state.bricks.filter((other) =>
-      other.y < brick.y && Math.abs(other.x - brick.x) < brickWidth * 0.62
-    ).length;
-    const neighbors = state.bricks.filter((other) =>
-      other !== brick && Math.abs(other.x - brick.x) < brickWidth * 1.45 && Math.abs(other.y - brick.y) < state.layout.brickHeight * 1.7
-    ).length;
-    const laneChange = lastTargetX == null ? 0 : Math.abs(brick.x - lastTargetX) / state.world.width;
-
-    // Exposed bricks are reliable shots. Prefer ones supporting a tall lane,
-    // surrounded by bricks, and away from the previous target so trajectories
-    // sweep the board instead of repeating vertically.
-    const score = (below === 0 ? 80 : -below * 45)
-      + aboveInLane * 18
-      + neighbors * 7
-      + laneChange * 24
-      + brick.y / state.world.height * 12;
-    return !best || score > best.score ? { brick, score } : best;
-  }, null)?.brick;
+function chooseBankShot(state) {
+  const useLeftWall = state.ball.x < state.world.width / 2;
+  return {
+    // Aim just outside the playable bounds. The boundary reflection turns
+    // this into a shallow bank that enters above the brick wall instead of
+    // repeatedly striking its front face.
+    x: useLeftWall ? 10 : state.world.width - 10,
+    y: state.layout.top + 100
+  };
 }
 
 export function update(world) {
@@ -49,8 +33,7 @@ export function update(world) {
   if (state.ball.vy > 0 && !lockedTarget && state.bricks.length) {
     lockedTarget = state.bricks.length <= 6
       ? chooseCleanupTarget(state)
-      : chooseStrategicTarget(state);
-    lastTargetX = lockedTarget?.x ?? lastTargetX;
+      : chooseBankShot(state);
   }
 
   applyBotInput(world, {

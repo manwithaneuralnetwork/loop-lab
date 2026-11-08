@@ -12,9 +12,18 @@ describe('Neon Breakout project', () => {
     }, 'simulation.js', {}, {}, 'bot.js');
 
     const game = runtime.world as typeof runtime.world & {
-      gameState: { score: number; lives: number; startingLives: number; remaining: number; finished: boolean; effects: unknown[] };
+      gameState: {
+        score: number; lives: number; startingLives: number; remaining: number;
+        finished: boolean; effects: unknown[];
+        ball: { position: { y: number } }; layout: { top: number };
+      };
     };
-    for (let frame = 0; frame < 59 * 60 && !game.gameState.finished; frame += 1) runtime.step();
+    let reachedBehindWall = false;
+    for (let frame = 0; frame < 59 * 60 && !game.gameState.finished; frame += 1) {
+      runtime.step();
+      if (game.gameState.ball.position.y < game.gameState.layout.top - 22 && game.gameState.remaining > 6) reachedBehindWall = true;
+    }
+    expect(reachedBehindWall).toBe(true);
     expect(game.gameState.score).toBeGreaterThan(0);
     expect(game.gameState.lives).toBe(game.gameState.startingLives);
     expect(game.gameState.remaining).toBe(0);
