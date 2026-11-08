@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "message": { "type": "string" },
+    "proposals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "path": { "type": "string" },
+          "summary": { "type": "string" },
+          "content": { "type": "string" }
+        },
+        "required": ["path", "summary", "content"]
+      }
+    }
+  },
+  "required": ["message", "proposals"]
+}

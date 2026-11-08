@@ -141,7 +141,8 @@ const workspaceAgentApi = new WorkspaceAgentAPI({
   runtime: () => ({ playing: isPlaying, errors, profile: profileStatus.textContent || 'No profile yet' }),
   onFileWritten: (file) => {
     if (!project.openFileIds.includes(file.id)) project.openFileIds.push(file.id);
-    project.activeFileId = file.id; showFile(file); workspaceFiles.render(); scheduleSave();
+    if (!agentPanel?.isOpen && project.activeFileId === file.id) showFile(file);
+    workspaceFiles.render(); scheduleSave();
   },
   onRun: runCode
 });
