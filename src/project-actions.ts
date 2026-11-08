@@ -47,7 +47,7 @@ export class ProjectActions {
   private download(): void {
     const blob = new Blob([serializeProjectPackage(this.project)], { type: 'application/vnd.loop-lab.project+json' });
     const url = URL.createObjectURL(blob); const link = document.createElement('a');
-    link.href = url; link.download = packageFilename('orbit-study'); link.click();
+    link.href = url; link.download = packageFilename(this.project.name); link.click();
     window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
     this.options.onNotice(`Downloaded ${link.download} (${this.formatBytes(blob.size)}).`);
   }
@@ -60,6 +60,8 @@ export class ProjectActions {
       const imported = parseProjectPackage(await file.text());
       if (!await this.confirmImport(imported, file.name)) return;
       await createCheckpoint(this.project, 'import');
+      imported.id = this.project.id; imported.name = this.project.name;
+      imported.createdAt = this.project.createdAt; imported.updatedAt = new Date().toISOString();
       await saveProject(imported, false);
       window.location.reload();
     } catch (error) {
@@ -86,7 +88,7 @@ export class ProjectActions {
   }
 
   private async showRecovery(): Promise<void> {
-    const checkpoints = await listCheckpoints();
+    const checkpoints = await listCheckpoints(this.project.id);
     const dialog = document.createElement('dialog'); dialog.className = 'recovery-dialog';
     const header = document.createElement('header'); header.innerHTML = '<div><span>PROJECT SAFETY</span><h2>Recovery history</h2></div><button aria-label="Close recovery history">×</button>';
     const list = document.createElement('div'); list.className = 'recovery-list';

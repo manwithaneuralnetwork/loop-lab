@@ -21,6 +21,16 @@ export interface AudioCommand {
   pan: number;
 }
 
+export interface RuntimeProfile {
+  fps: number;
+  updateMs: number;
+  renderMs: number;
+  frameMs: number;
+  objects: number;
+  maxObjects: number;
+  longFrames: number;
+}
+
 export type HostToRuntimeMessage =
   | { type: 'init'; canvas: OffscreenCanvas; width: number; height: number }
   | { type: 'run'; code: string; params: ParameterValues; files?: Record<string, string>; assets?: Record<string, string>; entry?: string }
@@ -36,7 +46,8 @@ export type HostToRuntimeMessage =
 export type RuntimeToHostMessage =
   | { type: 'ready' }
   | { type: 'parameters'; schema: ParameterSchema; params: ParameterValues }
-  | { type: 'log'; level: 'ok' | 'info'; message: string }
+  | { type: 'log'; level: 'ok' | 'info' | 'warning'; message: string }
+  | { type: 'profile'; profile: RuntimeProfile }
   | { type: 'audio'; command: AudioCommand }
   | { type: 'finished'; reason: string; elapsed: number; frame: number }
   | { type: 'error'; message: string; stack?: string; file?: string; line?: number; column?: number }

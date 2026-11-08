@@ -115,4 +115,15 @@ describe('World', () => {
     world.updateInput(undefined, 'ArrowLeft', false);
     expect(world.input.keys.has('ArrowLeft')).toBe(false);
   });
+
+  it('enforces object, trail, and per-frame audio limits', () => {
+    const world = new World(100, 100, 1, { hit: 'data:audio/mpeg;base64,abc' }, {
+      maxObjects: 2, maxTrailPointsPerObject: 4, maxAudioCommandsPerFrame: 1
+    });
+    const first = world.circle({ trail: 100 }); world.circle();
+    expect(first.trailLength).toBe(4);
+    expect(() => world.circle()).toThrow(/at most 2 live objects/);
+    world.playSound('hit'); world.playSound('hit');
+    expect(world.drainAudio()).toHaveLength(1);
+  });
 });

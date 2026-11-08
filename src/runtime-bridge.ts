@@ -9,6 +9,9 @@ export class RuntimeBridge {
   private readonly audio = new AudioEngine();
   private readonly handleKeyDown = (event: KeyboardEvent) => this.handleKey(event, true);
   private readonly handleKeyUp = (event: KeyboardEvent) => this.handleKey(event, false);
+  private watchdog: ReturnType<typeof setInterval> | null = null;
+  private lastResponseAt = performance.now();
+  private expectingActivity = false;
 
   constructor(
     private readonly viewport: HTMLElement,
@@ -26,10 +29,18 @@ export class RuntimeBridge {
     const offscreen = this.canvas.transferControlToOffscreen();
     this.worker = new Worker(new URL('./engine/runtime.worker.ts', import.meta.url), { type: 'module' });
     this.worker.onmessage = (event: MessageEvent<RuntimeToHostMessage>) => {
+      this.lastResponseAt = performance.now();
+      if (event.data.type === 'status' && !event.data.playing || event.data.type === 'finished' || event.data.type === 'error') this.expectingActivity = false;
       if (event.data.type === 'audio') void this.audio.play(event.data.command);
       this.listener(event.data);
     };
     this.worker.onerror = (event) => this.listener({ type: 'error', message: event.message });
+    this.lastResponseAt = performance.now();
+    this.watchdog = setInterval(() => {
+      if (!this.expectingActivity || performance.now() - this.lastResponseAt < 3000) return;
+      this.worker?.terminate(); this.worker = null; this.expectingActivity = false;
+      this.listener({ type: 'error', message: 'Simulation stopped: one update exceeded the 3 second execution limit.' });
+    }, 500);
     this.canvas.addEventListener('pointermove', (event) => this.postPointer(event));
     this.canvas.addEventListener('pointerdown', (event) => { this.canvas?.setPointerCapture(event.pointerId); this.canvas?.focus(); this.postPointer(event, true); });
     this.canvas.addEventListener('pointerup', (event) => this.postPointer(event, false));
@@ -52,6 +63,9 @@ export class RuntimeBridge {
   }
 
   post(message: HostToRuntimeMessage, transfer: Transferable[] = []): void {
+    if (message.type === 'run' || message.type === 'restart' || message.type === 'step' || message.type === 'seek' || message.type === 'play' && message.playing) {
+      this.expectingActivity = true; this.lastResponseAt = performance.now();
+    }
     this.worker?.postMessage(message, transfer);
   }
 
@@ -72,6 +86,7 @@ export class RuntimeBridge {
   }
 
   dispose(): void {
+    if (this.watchdog) clearInterval(this.watchdog); this.watchdog = null; this.expectingActivity = false;
     this.worker?.terminate();
     window.removeEventListener('keydown', this.handleKeyDown);
     window.removeEventListener('keyup', this.handleKeyUp);

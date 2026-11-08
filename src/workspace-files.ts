@@ -205,6 +205,15 @@ export class WorkspaceFiles {
 
   private async importFiles(): Promise<void> {
     const selected = [...(this.importInput.files || [])];
+    const oversized = selected.find((file) => file.size > 25 * 1024 * 1024);
+    if (oversized) {
+      this.importInput.value = '';
+      this.options.onNotice(`${oversized.name} is larger than the 25 MB per-file project limit.`);
+      return;
+    }
+    if (selected.reduce((sum, file) => sum + file.size, 0) > 100 * 1024 * 1024) {
+      this.importInput.value = ''; this.options.onNotice('That import exceeds the 100 MB project import limit.'); return;
+    }
     for (const source of selected) {
       const ext = extension(source.name);
       const isText = source.type.startsWith('text/') || TEXT_EXTENSIONS.has(ext);

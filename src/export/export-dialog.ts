@@ -63,6 +63,7 @@ export class ExportDialog {
   private cancelled = false;
   private rendering = false;
   private nextFrameTimer: number | null = null;
+  private frameWatchdog: number | null = null;
   private renderStartedAt = 0;
   private exportAudio: AudioEngine | null = null;
 
@@ -333,6 +334,8 @@ export class ExportDialog {
       this.worker = worker;
       worker.onerror = (event) => this.finishWithError(event.message || 'The export worker stopped unexpectedly.');
       worker.onmessage = (event: MessageEvent<ExportWorkerResponse>) => {
+        if (this.frameWatchdog != null) window.clearTimeout(this.frameWatchdog);
+        this.frameWatchdog = null;
         const message = event.data;
         if (message.type === 'frame') {
           renderedFrames = message.frame;
@@ -346,7 +349,10 @@ export class ExportDialog {
           const elapsed = (performance.now() - this.renderStartedAt) / 1000;
           const remaining = message.frame > 0 ? Math.max(0, (elapsed / message.frame) * (message.totalFrames - message.frame)) : 0;
           this.setStatus(`Rendering frame ${message.frame.toLocaleString()} of ${message.totalFrames.toLocaleString()} · about ${Math.ceil(remaining)}s left`);
-          this.nextFrameTimer = window.setTimeout(() => worker.postMessage({ type: 'next' }), 1000 / plan.fps);
+          this.nextFrameTimer = window.setTimeout(() => {
+            worker.postMessage({ type: 'next' });
+            this.frameWatchdog = window.setTimeout(() => this.finishWithError('Export stopped: one simulation frame exceeded the 5 second execution limit.'), 5000);
+          }, 1000 / plan.fps);
         } else if (message.type === 'complete') {
           renderedFrames = message.frames;
           conditionFinished = message.finished;
@@ -368,6 +374,7 @@ export class ExportDialog {
         fps: plan.fps,
         totalFrames: plan.totalFrames
       });
+      this.frameWatchdog = window.setTimeout(() => this.finishWithError('Export stopped: setup exceeded the 5 second execution limit.'), 5000);
     } catch (error) {
       this.finishWithError(error instanceof Error ? error.message : String(error));
     }
@@ -395,7 +402,9 @@ export class ExportDialog {
 
   private cleanupJob(): void {
     if (this.nextFrameTimer != null) window.clearTimeout(this.nextFrameTimer);
+    if (this.frameWatchdog != null) window.clearTimeout(this.frameWatchdog);
     this.nextFrameTimer = null;
+    this.frameWatchdog = null;
     this.worker?.terminate();
     this.worker = null;
     this.stream?.getTracks().forEach((track) => track.stop());

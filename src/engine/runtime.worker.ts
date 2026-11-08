@@ -2,6 +2,7 @@
 import { CanvasRenderer } from './canvas-renderer';
 import type { HostToRuntimeMessage, RuntimeToHostMessage } from './protocol';
 import { SimulationRuntime } from './simulation';
+import { DEFAULT_WORLD_LIMITS } from './world';
 
 const workerScope = self as unknown as DedicatedWorkerGlobalScope;
 let runtime = new SimulationRuntime(1080, 1080);
@@ -10,6 +11,12 @@ let playing = true;
 let playbackRate = 1;
 let stepAccumulator = 0;
 let timer: ReturnType<typeof setInterval> | null = null;
+let profileStartedAt = performance.now();
+let profileFrames = 0;
+let updateTotal = 0;
+let renderTotal = 0;
+let longFrames = 0;
+let lastWarningAt = 0;
 
 function send(message: RuntimeToHostMessage): void { workerScope.postMessage(message); }
 function flushAudio(): void {
@@ -38,26 +45,57 @@ function reportLoaded(): void {
 
 function restart(): void {
   runtime.restart();
+  playing = true;
+  resetProfile();
   renderer?.render(runtime.world);
   reportLoaded();
+  send({ type: 'status', playing: true });
   send({ type: 'time', elapsed: runtime.elapsed, frame: runtime.frame, objectCount: runtime.world.objects.length });
+}
+
+function resetProfile(): void {
+  profileStartedAt = performance.now(); profileFrames = 0; updateTotal = 0; renderTotal = 0; longFrames = 0;
+}
+
+function reportProfile(now: number): void {
+  const elapsed = now - profileStartedAt; if (elapsed < 1000 || profileFrames === 0) return;
+  const updateMs = updateTotal / profileFrames; const renderMs = renderTotal / profileFrames;
+  const profile = {
+    fps: (profileFrames * 1000) / elapsed, updateMs, renderMs, frameMs: updateMs + renderMs,
+    objects: runtime.world.objects.length, maxObjects: DEFAULT_WORLD_LIMITS.maxObjects, longFrames
+  };
+  send({ type: 'profile', profile });
+  if ((profile.frameMs > 16.7 || profile.objects > profile.maxObjects * 0.8) && now - lastWarningAt > 5000) {
+    const message = profile.objects > profile.maxObjects * 0.8
+      ? `Resource warning: ${profile.objects.toLocaleString()} of ${profile.maxObjects.toLocaleString()} objects in use.`
+      : `Performance warning: simulation work averages ${profile.frameMs.toFixed(1)} ms per frame.`;
+    send({ type: 'log', level: 'warning', message }); lastWarningAt = now;
+  }
+  resetProfile();
 }
 
 function tick(): void {
   if (!playing) return;
   try {
+    const frameStartedAt = performance.now();
     stepAccumulator += playbackRate;
     while (stepAccumulator >= 1) {
       runtime.step();
       flushAudio();
       stepAccumulator -= 1;
     }
+    const updateFinishedAt = performance.now();
     if (runtime.world.finished) {
       playing = false;
       send({ type: 'finished', reason: runtime.world.finishReason, elapsed: runtime.elapsed, frame: runtime.frame });
       send({ type: 'status', playing });
     }
     renderer?.render(runtime.world);
+    const renderFinishedAt = performance.now();
+    const frameMs = renderFinishedAt - frameStartedAt;
+    profileFrames += 1; updateTotal += updateFinishedAt - frameStartedAt; renderTotal += renderFinishedAt - updateFinishedAt;
+    if (frameMs > 16.7) longFrames += 1;
+    reportProfile(renderFinishedAt);
     if (runtime.frame % 6 === 0) {
       send({ type: 'time', elapsed: runtime.elapsed, frame: runtime.frame, objectCount: runtime.world.objects.length });
     }
@@ -77,6 +115,7 @@ workerScope.onmessage = (event: MessageEvent<HostToRuntimeMessage>) => {
       if (message.files) runtime.loadProject(message.files, message.entry || 'simulation.js', message.params, message.assets);
       else runtime.load(message.code, message.params);
       playing = true;
+      resetProfile();
       renderer?.render(runtime.world);
       reportLoaded();
     } else if (message.type === 'restart') restart();

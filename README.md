@@ -13,7 +13,7 @@ The implementation is split into typed boundaries:
 
 Video export is local-only in this version. The export dialog snapshots the current code and parameter values, supports per-export overrides and randomized creative parameters, and renders deterministic WebM video with project audio in a separate worker. Output can use 24, 30, or 60 fps with 720p, 1080p, or original-size bounds; no project or cloud data is involved.
 
-The workspace now persists multiple code files, folders, imported assets, open tabs, and export history. `simulation.js` is the protected runtime entry file, and relative modules can import one another with standard JavaScript syntax. The editor provides Loop Lab API completion, hover documentation, project-aware diagnostics, and search. Preview controls support deterministic seeking, 0.25×–4× playback, stepping, pointer/keyboard input, runtime status, fullscreen presentation, and limited master audio. The engine now renders circles, rectangles, text, and imported-image sprites, with code-defined completion conditions, stable object identities, lifecycle helpers, render layers, a camera, spatial queries, boundary and object-contact events, lightweight circle/rectangle collision response, and Web Audio playback for imported sounds. WebM exports offer naming, a separate maximum-length safety ceiling, early completion through `world.finish()`, 720p/1080p/original bounds, 24/30/60 fps, audio and asset preloading, progress/ETA, and cancellation. See [`docs/runtime-api.md`](docs/runtime-api.md) for the programming model.
+The workspace now has a multi-project dashboard with creation, three starter templates, duplication, and project switching. Each project persists multiple code files, folders, imported assets, open tabs, and export history. `simulation.js` is the protected runtime entry file, and relative modules can import one another with standard JavaScript syntax. The editor provides Loop Lab API completion, hover documentation, project-aware diagnostics, and search. Preview controls support deterministic seeking, 0.25×–4× playback, stepping, pointer/keyboard input, runtime status, fullscreen presentation, limited master audio, and a live one-second performance profile. The engine now renders circles, rectangles, text, and imported-image sprites, with code-defined completion conditions, stable object identities, lifecycle helpers, render layers, a camera, spatial queries, boundary and object-contact events, lightweight circle/rectangle collision response, and Web Audio playback for imported sounds. WebM exports offer naming, a separate maximum-length safety ceiling, early completion through `world.finish()`, 720p/1080p/original bounds, 24/30/60 fps, audio and asset preloading, progress/ETA, and cancellation. See [`docs/runtime-api.md`](docs/runtime-api.md) for the programming model.
 
 ## Rendering and physics roadmap
 
@@ -24,6 +24,10 @@ Loop Lab currently uses its own small Canvas 2D renderer. **PixiJS is not planne
 ## Project durability
 
 Projects are saved in IndexedDB rather than browser key/value storage, allowing substantially larger imported assets. Autosave keeps up to ten rotating recovery checkpoints, and users can create explicit checkpoints from the Explorer menu. Complete projects can be downloaded and reopened as readable, versioned `.looplab` JSON packages. See [`docs/project-packages.md`](docs/project-packages.md).
+
+## Runtime safety
+
+The default sandbox caps a simulation at 5,000 live objects, 600 trail samples per object, and 256 audio events per frame. Imported files are capped at 25 MB each and 100 MB per import. A host-side watchdog replaces a worker whose update blocks for more than three seconds; export setup and frames have a five-second ceiling. The Preview header reports measured fps, object count, average update/render time, and long frames without adding work to the simulation worker's hot path.
 
 ## Local development
 

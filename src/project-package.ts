@@ -35,7 +35,12 @@ export function parseProjectPackage(source: string): ProjectState {
   }
   const activeFileId = project.files.some((file) => file.id === project.activeFileId)
     ? project.activeFileId! : project.files.find((file) => file.kind === 'code')!.id;
+  const now = new Date().toISOString();
   return {
+    id: typeof project.id === 'string' ? project.id : crypto.randomUUID(),
+    name: typeof project.name === 'string' ? project.name : 'Imported Project',
+    createdAt: typeof project.createdAt === 'string' ? project.createdAt : now,
+    updatedAt: typeof project.updatedAt === 'string' ? project.updatedAt : now,
     files: project.files,
     folders: Array.isArray(project.folders) ? project.folders.filter((folder): folder is string => typeof folder === 'string') : [],
     activeFileId,

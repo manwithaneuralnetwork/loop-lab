@@ -45,6 +45,18 @@ export interface WorldInput {
   keys: Set<string>;
 }
 
+export interface WorldLimits {
+  maxObjects: number;
+  maxTrailPointsPerObject: number;
+  maxAudioCommandsPerFrame: number;
+}
+
+export const DEFAULT_WORLD_LIMITS: WorldLimits = {
+  maxObjects: 5000,
+  maxTrailPointsPerObject: 600,
+  maxAudioCommandsPerFrame: 256
+};
+
 export class Body {
   readonly id: string;
   readonly kind: 'circle' | 'rectangle' | 'sprite' | 'text';
@@ -190,7 +202,7 @@ export class World {
   private nextSoundId = 1;
   private audioQueue: AudioCommand[] = [];
 
-  constructor(width: number, height: number, seed = 1, assets: Record<string, string> = {}) {
+  constructor(width: number, height: number, seed = 1, assets: Record<string, string> = {}, readonly limits: WorldLimits = DEFAULT_WORLD_LIMITS) {
     this.width = width;
     this.height = height;
     this.bounds = { left: 0, top: 0, right: width, bottom: height };
@@ -209,27 +221,29 @@ export class World {
   }
 
   circle(options: BodyOptions = {}): Body {
-    const body = new Body(`body-${this.nextObjectId++}`, 'circle', options);
-    this.objects.push(body);
-    return body;
+    return this.createBody('circle', options);
   }
 
   rectangle(options: BodyOptions = {}): Body {
-    const body = new Body(`body-${this.nextObjectId++}`, 'rectangle', options);
-    this.objects.push(body);
-    return body;
+    return this.createBody('rectangle', options);
   }
 
   sprite(options: BodyOptions & { asset: string }): Body {
-    const body = new Body(`body-${this.nextObjectId++}`, 'sprite', { ...options, asset: this.assets[options.asset] || options.asset });
-    this.objects.push(body);
-    return body;
+    return this.createBody('sprite', { ...options, asset: this.assets[options.asset] || options.asset });
   }
 
   text(options: BodyOptions & { text: string }): Body {
-    const body = new Body(`body-${this.nextObjectId++}`, 'text', options);
-    this.objects.push(body);
-    return body;
+    return this.createBody('text', options);
+  }
+
+  private createBody(kind: Body['kind'], options: BodyOptions): Body {
+    if (this.objects.length >= this.limits.maxObjects) {
+      throw new Error(`Resource limit reached: a project can contain at most ${this.limits.maxObjects.toLocaleString()} live objects.`);
+    }
+    const body = new Body(`body-${this.nextObjectId++}`, kind, {
+      ...options, trail: Math.min(this.limits.maxTrailPointsPerObject, Math.max(0, Number(options.trail) || 0))
+    });
+    this.objects.push(body); return body;
   }
 
   asset(path: string): string {
@@ -242,6 +256,7 @@ export class World {
 
   playSound(path: string, options: SoundOptions = {}): string {
     const id = `sound-${this.nextSoundId++}`;
+    if (this.audioQueue.length >= this.limits.maxAudioCommandsPerFrame) return id;
     this.audioQueue.push({
       id,
       source: this.asset(path),

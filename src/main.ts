@@ -9,6 +9,7 @@ import { BOUNCING_BALLS_CODE, BOUNCING_BALLS_HELPERS } from './samples/bouncing-
 import { ExportDialog } from './export/export-dialog';
 import { WorkspaceFiles } from './workspace-files';
 import { ProjectActions } from './project-actions';
+import { ProjectDashboard } from './project-dashboard';
 
 function query<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -41,6 +42,9 @@ const properties = query<HTMLElement>('.properties');
 const saveState = query<HTMLElement>('.crumbs em');
 const liveStatus = query<HTMLElement>('.live-status');
 const problemCount = query<HTMLElement>('.console-tabs button:nth-child(2) b');
+const profileStatus = query<HTMLElement>('.profile-status');
+query<HTMLElement>('.crumbs > strong').textContent = project.name;
+document.title = `${project.name} — Loop Lab`;
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let currentSchema: ParameterSchema = {};
@@ -104,6 +108,9 @@ workspaceFiles = new WorkspaceFiles(project, {
   onNotice: (message) => addLog(message)
 });
 new ProjectActions(project, workspaceFiles, { onNotice: (message) => addLog(message) });
+const dashboard = new ProjectDashboard(project, { onNotice: (message) => addLog(message, 'ok') });
+query<HTMLButtonElement>('.projects-link').addEventListener('click', () => void dashboard.open());
+query<HTMLButtonElement>('.project-back').addEventListener('click', () => void dashboard.open());
 setSaveState(true);
 
 const runtime = new RuntimeBridge(viewport, handleRuntimeMessage, project.worldWidth, project.worldHeight);
@@ -133,9 +140,9 @@ function escapeHTML(value: unknown): string {
   const node = document.createElement('div'); node.textContent = String(value); return node.innerHTML;
 }
 
-function addLog(message: string, level: 'info' | 'ok' | 'error' = 'info', line?: number, column?: number, file = 'simulation.js'): void {
+function addLog(message: string, level: 'info' | 'ok' | 'warning' | 'error' = 'info', line?: number, column?: number, file = 'simulation.js'): void {
   const row = document.createElement(line ? 'button' : 'p');
-  const icon = level === 'error' ? '×' : level === 'ok' ? '●' : '›';
+  const icon = level === 'error' ? '×' : level === 'ok' ? '●' : level === 'warning' ? '!' : '›';
   row.innerHTML = `<time>${stamp()}</time><span class="${level}">${icon}</span> ${escapeHTML(message)}${line ? `<em>${escapeHTML(file)}:${line}${column ? `:${column}` : ''}</em>` : ''}`;
   if (line) {
     row.className = 'source-log';
@@ -203,6 +210,11 @@ function handleRuntimeMessage(message: RuntimeToHostMessage): void {
     isPlaying = false; playButton.textContent = '▶'; setRuntimeStatus('paused'); updateTimeline(message.elapsed);
   } else if (message.type === 'audio') {
     audioButton.classList.remove('pulse'); void audioButton.offsetWidth; audioButton.classList.add('pulse');
+  } else if (message.type === 'profile') {
+    const profile = message.profile; const stressed = profile.frameMs > 16.7 || profile.objects > profile.maxObjects * 0.8;
+    profileStatus.textContent = `${Math.round(profile.fps)} fps · ${profile.objects.toLocaleString()} objects`;
+    profileStatus.classList.toggle('warning', stressed);
+    profileStatus.title = `Update ${profile.updateMs.toFixed(2)} ms · Render ${profile.renderMs.toFixed(2)} ms · ${profile.longFrames} long frames in the last second · ${profile.objects}/${profile.maxObjects} objects`;
   } else if (message.type === 'time' && !isScrubbing) updateTimeline(message.elapsed);
 }
 
