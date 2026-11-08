@@ -47,6 +47,17 @@ async function writeDiskProject(project) {
   const existing = (await listDiskProjects()).find((candidate) => candidate.id === project.id || candidate.name === project.name);
   const directory = path.join(PROJECTS_ROOT, existing ? slugify(existing.name) : slugify(project.name));
   await fs.mkdir(directory, { recursive: true });
+  const nextPaths = new Set((project.files || []).map((file) => file.path.replace(/\\/g, '/')));
+  for (const file of existing?.files || []) {
+    if (nextPaths.has(file.path.replace(/\\/g, '/'))) continue;
+    const stalePath = safeProjectPath(directory, file.path);
+    await fs.rm(stalePath, { force: true });
+    let parent = path.dirname(stalePath);
+    while (parent !== directory && parent.startsWith(`${directory}${path.sep}`)) {
+      try { await fs.rmdir(parent); } catch { break; }
+      parent = path.dirname(parent);
+    }
+  }
   const files = [];
   for (const file of project.files || []) {
     const filePath = safeProjectPath(directory, file.path);

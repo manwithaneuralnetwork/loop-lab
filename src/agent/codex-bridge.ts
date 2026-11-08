@@ -11,6 +11,9 @@ export interface CodexBridgeStatus {
 export interface CodexProposal { path: string; summary: string; content: string }
 export interface CodexAgentReply { message: string; proposals: CodexProposal[] }
 export interface AgentConversationMessage { role: 'user' | 'assistant'; content: string }
+export interface ReviewedCodexProposal extends CodexProposal {
+  proposalId: string; before: string; after: string; exists: boolean; changed: boolean; selected: boolean;
+}
 
 async function responseJson<T>(response: Response): Promise<T> {
   const payload = await response.json() as T & { error?: string };
@@ -46,6 +49,15 @@ export class CodexBridge {
   async apply(proposal: CodexProposal): Promise<void> {
     const response = await this.api.call({ tool: 'workspace.write_file', input: { path: proposal.path, content: proposal.content } }, { allowWrite: true });
     if (!response.ok) throw new Error(response.error || 'Could not apply the proposed edit.');
+  }
+
+  async review(proposal: CodexProposal): Promise<ReviewedCodexProposal> {
+    const response = await this.api.call({
+      tool: 'workspace.propose_edit', input: { path: proposal.path, content: proposal.content, summary: proposal.summary }
+    });
+    if (!response.ok) throw new Error(response.error || 'Could not prepare the proposed edit.');
+    const review = response.result as Omit<ReviewedCodexProposal, 'content' | 'selected'>;
+    return { ...proposal, ...review, selected: review.changed };
   }
 }
 

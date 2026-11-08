@@ -3,7 +3,7 @@ import './refinements.css';
 import { createCodeEditor } from './code-editor';
 import type { ParameterDefinition, ParameterSchema, ParameterValue, ParameterValues, RuntimeToHostMessage } from './engine/protocol';
 import { isParameterDefinition } from './engine/parameters';
-import { loadProject, saveProject, syncDevelopmentProjects, type ProjectFile } from './project-store';
+import { createCheckpoint, loadProject, saveProject, syncDevelopmentProjects, type ProjectFile, type ProjectState } from './project-store';
 import { RuntimeBridge } from './runtime-bridge';
 import { BOUNCING_BALLS_CODE, BOUNCING_BALLS_HELPERS } from './samples/bouncing-balls';
 import { ExportDialog } from './export/export-dialog';
@@ -64,6 +64,7 @@ let suppressEditorChange = false;
 let errors = 0;
 let navigatingToProject = false;
 let agentPanel: AgentPanel;
+let agentUndoSnapshot: ProjectState | null = null;
 
 function entryFile(): ProjectFile {
   return project.files.find((file) => file.path === 'simulation.js') || project.files.find((file) => file.kind === 'code')!;
@@ -149,7 +150,20 @@ const workspaceAgentApi = new WorkspaceAgentAPI({
 agentPanel = new AgentPanel(query<HTMLElement>('.editor'), {
   api: workspaceAgentApi,
   activeFile: () => project.files.find((file) => file.id === project.activeFileId)?.path || 'No active file',
-  onStateChange: () => workspaceFiles.render()
+  onStateChange: () => workspaceFiles.render(),
+  createRecoveryPoint: async () => {
+    agentUndoSnapshot = structuredClone(project); await createCheckpoint(project, 'manual');
+  },
+  undoLastChange: async () => {
+    if (!agentUndoSnapshot) return false;
+    const restored = structuredClone(agentUndoSnapshot); agentUndoSnapshot = null; Object.assign(project, restored);
+    await saveProject(project, false); workspaceFiles.render();
+    const active = project.files.find((file) => file.id === project.activeFileId && file.kind === 'code') || entryFile();
+    suppressEditorChange = true; editor.setCode(active.content); suppressEditorChange = false;
+    editorFileStatus.textContent = active.path; editorLanguage.textContent = editorLanguageFor(active.path); runCode(); return true;
+  },
+  runProject: runCode,
+  onNotice: (message) => addLog(message, 'ok')
 });
 Object.defineProperty(window, 'loopLabAgent', {
   configurable: true,
