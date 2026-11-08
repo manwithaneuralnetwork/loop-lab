@@ -32,6 +32,7 @@ const timeline = query<HTMLElement>('.timeline');
 const progressBar = query<HTMLElement>('.timeline i');
 const playhead = query<HTMLElement>('.timeline span');
 const gridButton = query<HTMLButtonElement>('.grid-button');
+const botModeButton = query<HTMLButtonElement>('.bot-mode-button');
 const fullscreenButton = query<HTMLButtonElement>('.stage-tools button[title="Fullscreen"]');
 const speedButton = query<HTMLButtonElement>('.transport .speed');
 const audioButton = query<HTMLButtonElement>('.audio-controls button');
@@ -69,6 +70,10 @@ function projectSources(): Record<string, string> {
 function projectAssets(): Record<string, string> {
   return Object.fromEntries(project.files.filter((file) => file.kind === 'asset').map((file) => [file.path, file.content]));
 }
+
+function botEntry(): string | undefined { return project.botMode && projectSources()['bot.js'] ? 'bot.js' : undefined; }
+botModeButton.classList.toggle('active', project.botMode);
+botModeButton.setAttribute('aria-pressed', String(project.botMode));
 
 function setSaveState(saved: boolean): void {
   saveState.textContent = saved ? '● Saved' : '● Unsaved';
@@ -201,8 +206,8 @@ function renderParameters(schema: ParameterSchema, values: ParameterValues): voi
 
 function handleRuntimeMessage(message: RuntimeToHostMessage): void {
   if (message.type === 'ready') {
-    if (pendingCode !== null) { runtime.post({ type: 'run', code: pendingCode, files: projectSources(), assets: projectAssets(), entry: entryFile().path, params: project.parameterValues }); pendingCode = null; initialRunComplete = true; }
-    else if (!initialRunComplete) { logs.innerHTML = ''; addLog('Compiling simulation…'); runtime.post({ type: 'run', code: entryFile().content, files: projectSources(), assets: projectAssets(), entry: entryFile().path, params: project.parameterValues }); initialRunComplete = true; }
+    if (pendingCode !== null) { runtime.post({ type: 'run', code: pendingCode, files: projectSources(), assets: projectAssets(), entry: entryFile().path, params: project.parameterValues, botEntry: botEntry() }); pendingCode = null; initialRunComplete = true; }
+    else if (!initialRunComplete) { logs.innerHTML = ''; addLog('Compiling simulation…'); runtime.post({ type: 'run', code: entryFile().content, files: projectSources(), assets: projectAssets(), entry: entryFile().path, params: project.parameterValues, botEntry: botEntry() }); initialRunComplete = true; }
   } else if (message.type === 'parameters') renderParameters(message.schema, message.params);
   else if (message.type === 'log') addLog(message.message, message.level);
   else if (message.type === 'error') {
@@ -270,6 +275,13 @@ window.addEventListener('keydown', (event) => { if (event.key === 'Escape' && st
 
 if (!project.gridVisible) { viewport.classList.add('grid-off'); gridButton.classList.add('inactive'); }
 gridButton.addEventListener('click', () => { project.gridVisible = !viewport.classList.toggle('grid-off'); gridButton.classList.toggle('inactive', !project.gridVisible); scheduleSave(); });
+botModeButton.addEventListener('click', () => {
+  if (!projectSources()['bot.js']) { addLog('Add a root bot.js file before enabling bot input.', 'warning'); return; }
+  project.botMode = !project.botMode; botModeButton.classList.toggle('active', project.botMode);
+  botModeButton.setAttribute('aria-pressed', String(project.botMode));
+  addLog(project.botMode ? 'Input provider changed to bot.js.' : 'Input provider changed to live user input.', 'ok');
+  scheduleSave(); runCode();
+});
 
 worldWidthInput.value = String(project.worldWidth); worldHeightInput.value = String(project.worldHeight);
 function applyViewportAspect(): void { viewport.style.aspectRatio = `${project.worldWidth} / ${project.worldHeight}`; }

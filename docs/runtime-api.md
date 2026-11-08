@@ -34,11 +34,11 @@ export function update(world) {
 }
 ```
 
-`world.elapsed` and `world.frame` are available when time is part of that condition, but a `duration` parameter has no special engine behavior. Video export has a separate maximum-length safety ceiling and stops earlier when `world.finish()` is called.
+`world.elapsed` and `world.frame` are available when time is part of that condition, but a `duration` parameter has no special engine behavior. Before video encoding, export runs the project without drawing or audio to find the exact frame where `world.finish()` is called. A project that cannot finish within 60 simulated seconds is rejected rather than producing a truncated video.
 
 ## Export bots
 
-Interactive projects that read `world.input` must include a root `bot.js` before video export is allowed. During export, its `update(world, dt, params)` runs before the simulation update on every fixed step. Preview remains human-controlled.
+Interactive projects that read `world.input` must include a root `bot.js` before video export is allowed. During export, its `update(world, dt, params)` runs before the simulation update on every fixed step. The **Bot** control beside the viewport switches preview to the same provider: the runtime ignores live pointer and keyboard messages and lets `bot.js` supply all input. Switching it off restores live user input.
 
 Games should expose a narrow automation boundary instead of asking bots to know internal object names:
 
@@ -55,7 +55,7 @@ export function update(world) {
 }
 ```
 
-This keeps exported video deterministic and makes the bot reusable by later replay, testing, and evaluation tools.
+This keeps exported video deterministic and makes the bot reusable by preview, later replay, testing, and evaluation tools.
 
 ## World
 

@@ -2,9 +2,9 @@
 export const parameters = {
   seed:        { value: 7, min: 1, max: 999, step: 1, group: "Game" },
   columns:     { value: 8, min: 5, max: 12, step: 1, group: "Game" },
-  rows:        { value: 6, min: 3, max: 9, step: 1, group: "Game" },
+  rows:        { value: 4, min: 3, max: 9, step: 1, group: "Game" },
   lives:       { value: 3, min: 1, max: 7, step: 1, group: "Game" },
-  ballSpeed:   { value: 540, min: 260, max: 900, step: 20, group: "Motion" },
+  ballSpeed:   { value: 760, min: 260, max: 900, step: 20, group: "Motion" },
   paddleWidth: { value: 150, min: 80, max: 240, step: 10, group: "Motion" },
   brickGap:    { value: 8, min: 2, max: 18, step: 1, group: "Layout" },
   ballColor:   { value: "#f6f3ea", type: "color", group: "Appearance" },
@@ -58,7 +58,11 @@ export function readBotState(world) {
       vx: state.ball.velocity.x, vy: state.ball.velocity.y
     },
     paddle: { x: state.paddle.position.x, width: state.paddle.width },
-    score: state.score, lives: state.lives, remaining: state.remaining,
+    bricks: world.tagged("brick").map((brick) => ({
+      x: brick.position.x, y: brick.position.y
+    })),
+    world: { width: world.width, height: world.height },
+    score: state.score, lives: state.lives, remaining: state.remaining, elapsed: world.elapsed,
     serving: state.serveFrames > 0, finished: state.finished
   };
 }
@@ -67,6 +71,9 @@ export function readBotState(world) {
 export function applyBotInput(world, input) {
   if (!world.gameState || !input || !Number.isFinite(input.paddleX)) return;
   world.gameState.botPaddleX = input.paddleX;
+  if (Number.isFinite(input.aimX) && Number.isFinite(input.aimY)) {
+    world.gameState.botAim = { x: input.aimX, y: input.aimY };
+  }
 }
 
 export function setup(world, params) {
@@ -116,7 +123,8 @@ export function setup(world, params) {
   world.gameState = {
     score: 0, lives: params.lives, startingLives: params.lives, remaining,
     paddle, ball, scoreLabel, livesLabel, hint,
-    serveFrames: 0, soundGate: 0, effects: [], finished: false, botPaddleX: null
+    serveFrames: 0, soundGate: 0, effects: [], finished: false,
+    botPaddleX: null, botAim: null
   };
   resetBall(world, world.gameState, 70);
 }
@@ -157,9 +165,18 @@ export function update(world, dt, params) {
 
   ball.color = params.ballColor;
   if (ball.touches(paddle) && ball.position.y < paddle.position.y) {
-    const offset = (ball.position.x - paddle.position.x) / (paddle.width / 2);
-    ball.velocity.x = offset * params.ballSpeed * 0.82;
-    ball.velocity.y = -Math.abs(ball.velocity.y);
+    if (state.botAim) {
+      const dx = state.botAim.x - ball.position.x;
+      const dy = state.botAim.y - ball.position.y;
+      const length = Math.max(1, Math.hypot(dx, dy));
+      ball.velocity.x = (dx / length) * params.ballSpeed;
+      ball.velocity.y = (dy / length) * params.ballSpeed;
+      state.botAim = null;
+    } else {
+      const offset = (ball.position.x - paddle.position.x) / (paddle.width / 2);
+      ball.velocity.x = offset * params.ballSpeed * 0.82;
+      ball.velocity.y = -Math.abs(ball.velocity.y);
+    }
     playHit(world, state, 0.16, 1.18);
   }
 

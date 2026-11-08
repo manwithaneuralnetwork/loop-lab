@@ -9,7 +9,7 @@ let renderer: CanvasRenderer | null = null;
 let canvas: OffscreenCanvas | null = null;
 let frame = 0;
 let totalFrames = 0;
-let stepsPerFrame = 2;
+let outputFps = 30;
 
 function send(message: ExportWorkerResponse, transfer: Transferable[] = []): void {
   scope.postMessage(message, transfer);
@@ -21,9 +21,11 @@ function sendFrame(): void {
     send({ type: 'complete', frames: frame, finished: runtime.world.finished });
     return;
   }
-  if (frame > 0) {
-    for (let step = 0; step < stepsPerFrame; step += 1) runtime.step();
-  }
+  // The simulation always advances at its fixed 60 Hz step. Output rates that
+  // do not divide 60 (notably 24 fps) alternate step counts to stay aligned
+  // with the exact presentation timestamp rather than drifting over time.
+  const targetTime = (frame + 1) / outputFps;
+  while (!runtime.world.finished && runtime.elapsed + 1e-9 < targetTime) runtime.step();
   const audio = runtime.world.drainAudio();
   renderer.render(runtime.world);
   const bitmap = canvas.transferToImageBitmap();
@@ -34,7 +36,16 @@ function sendFrame(): void {
 scope.onmessage = (event: MessageEvent<ExportWorkerRequest>) => {
   try {
     const message = event.data;
-    if (message.type === 'start') {
+    if (message.type === 'preflight') {
+      runtime = new SimulationRuntime(message.worldWidth, message.worldHeight);
+      runtime.loadProject(message.files, message.entry || 'simulation.js', message.params, message.assets, message.files['bot.js'] ? 'bot.js' : null);
+      const limitFrames = Math.ceil(message.limitSeconds / runtime.stepSize);
+      while (!runtime.world.finished && runtime.frame < limitFrames) runtime.step();
+      send({
+        type: 'preflight', finished: runtime.world.finished, duration: runtime.elapsed,
+        frames: runtime.frame, reason: runtime.world.finishReason
+      });
+    } else if (message.type === 'start') {
       runtime = new SimulationRuntime(message.worldWidth, message.worldHeight);
       if (message.files) runtime.loadProject(
         message.files, message.entry || 'simulation.js', message.params, message.assets,
@@ -46,7 +57,7 @@ scope.onmessage = (event: MessageEvent<ExportWorkerRequest>) => {
       renderer.resize(message.outputWidth, message.outputHeight);
       frame = 0;
       totalFrames = message.totalFrames;
-      stepsPerFrame = Math.max(1, Math.round((1 / message.fps) / runtime.stepSize));
+      outputFps = message.fps;
       void renderer.preload(runtime.world).then(sendFrame).catch((error) => send({ type: 'error', message: error instanceof Error ? error.message : String(error) }));
     } else if (message.type === 'next') sendFrame();
   } catch (error) {

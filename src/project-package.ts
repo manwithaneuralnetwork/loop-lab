@@ -47,6 +47,7 @@ export function parseProjectPackage(source: string): ProjectState {
     openFileIds: Array.isArray(project.openFileIds) ? project.openFileIds.filter((id): id is string => typeof id === 'string' && project.files!.some((file) => file.id === id)) : [activeFileId],
     parameterValues: project.parameterValues && typeof project.parameterValues === 'object' ? project.parameterValues : {},
     gridVisible: project.gridVisible ?? true,
+    botMode: project.botMode ?? false,
     worldWidth: Number(project.worldWidth) || 1080,
     worldHeight: Number(project.worldHeight) || 1080,
     exportHistory: Array.isArray(project.exportHistory) ? project.exportHistory : []

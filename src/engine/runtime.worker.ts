@@ -17,6 +17,7 @@ let updateTotal = 0;
 let renderTotal = 0;
 let longFrames = 0;
 let lastWarningAt = 0;
+let botMode = false;
 
 function send(message: RuntimeToHostMessage): void { workerScope.postMessage(message); }
 function flushAudio(): void {
@@ -112,7 +113,8 @@ workerScope.onmessage = (event: MessageEvent<HostToRuntimeMessage>) => {
       timer = setInterval(tick, 1000 / 60);
       send({ type: 'ready' });
     } else if (message.type === 'run') {
-      if (message.files) runtime.loadProject(message.files, message.entry || 'simulation.js', message.params, message.assets);
+      botMode = Boolean(message.botEntry);
+      if (message.files) runtime.loadProject(message.files, message.entry || 'simulation.js', message.params, message.assets, message.botEntry || null);
       else runtime.load(message.code, message.params);
       playing = true;
       resetProfile();
@@ -131,7 +133,7 @@ workerScope.onmessage = (event: MessageEvent<HostToRuntimeMessage>) => {
       renderer?.render(runtime.world);
       send({ type: 'status', playing: false });
       send({ type: 'time', elapsed: runtime.elapsed, frame: runtime.frame, objectCount: runtime.world.objects.length });
-    } else if (message.type === 'input') {
+    } else if (message.type === 'input' && !botMode) {
       runtime.world.updateInput(message.pointer, message.key, message.pressed);
     } else if (message.type === 'step') {
       playing = false;

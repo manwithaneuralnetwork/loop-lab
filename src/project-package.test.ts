@@ -6,7 +6,7 @@ const project: ProjectState = {
   id: 'project', name: 'Test Project', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
   files: [{ id: 'entry', path: 'simulation.js', kind: 'code', content: 'export function setup() {}' }],
   folders: [], activeFileId: 'entry', openFileIds: ['entry'], parameterValues: {}, gridVisible: true,
-  worldWidth: 640, worldHeight: 360, exportHistory: []
+  worldWidth: 640, worldHeight: 360, botMode: false, exportHistory: []
 };
 
 describe('Loop Lab project packages', () => {

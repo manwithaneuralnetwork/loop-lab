@@ -1,6 +1,6 @@
 # Project storage and `.looplab` packages
 
-Loop Lab stores production/browser projects in IndexedDB. This includes code, folders, imported asset data, open tabs, parameter overrides, world dimensions, and export history. Existing `localStorage` projects are migrated automatically when no IndexedDB project exists.
+Loop Lab stores production/browser projects in IndexedDB. This includes code, folders, imported asset data, open tabs, parameter overrides, world dimensions, the selected human/bot input mode, and export history. Existing `localStorage` projects are migrated automatically when no IndexedDB project exists.
 
 ## Development project directories
 

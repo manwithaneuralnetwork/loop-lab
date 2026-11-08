@@ -11,12 +11,13 @@ describe('Neon Breakout project', () => {
       'bot.js': botSource
     }, 'simulation.js', {}, {}, 'bot.js');
 
-    for (let frame = 0; frame < 60 * 30 && !runtime.world.finished; frame += 1) runtime.step();
+    for (let frame = 0; frame < 60 * 60 && !runtime.world.finished; frame += 1) runtime.step();
     const game = runtime.world as typeof runtime.world & {
       gameState: { score: number; lives: number; startingLives: number; remaining: number };
     };
     expect(game.gameState.score).toBeGreaterThan(0);
     expect(game.gameState.lives).toBe(game.gameState.startingLives);
-    expect(game.gameState.remaining).toBeLessThan(48);
+    expect(game.gameState.remaining).toBe(0);
+    expect(runtime.world.finishReason).toBe('All bricks cleared');
   });
 });

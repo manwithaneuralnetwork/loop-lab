@@ -33,7 +33,7 @@ export interface RuntimeProfile {
 
 export type HostToRuntimeMessage =
   | { type: 'init'; canvas: OffscreenCanvas; width: number; height: number }
-  | { type: 'run'; code: string; params: ParameterValues; files?: Record<string, string>; assets?: Record<string, string>; entry?: string }
+  | { type: 'run'; code: string; params: ParameterValues; files?: Record<string, string>; assets?: Record<string, string>; entry?: string; botEntry?: string }
   | { type: 'restart' }
   | { type: 'play'; playing: boolean }
   | { type: 'speed'; rate: number }

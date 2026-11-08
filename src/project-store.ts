@@ -7,6 +7,7 @@ export interface ProjectState {
   id: string; name: string; createdAt: string; updatedAt: string;
   files: ProjectFile[]; folders: string[]; activeFileId: string; openFileIds: string[];
   parameterValues: ParameterValues; gridVisible: boolean; worldWidth: number; worldHeight: number;
+  botMode: boolean;
   exportHistory: ExportHistoryEntry[];
 }
 export interface ProjectCheckpoint {
@@ -46,7 +47,7 @@ export function createProjectState(
     id: crypto.randomUUID(), name: name.trim() || 'Untitled Project', createdAt: now, updatedAt: now,
     files: [file, ...additionalFiles.map((item) => createProjectFile(item.path, item.content))], folders: ['assets'],
     activeFileId: file.id, openFileIds: [file.id], parameterValues: {}, gridVisible: true,
-    worldWidth: dimensions.width, worldHeight: dimensions.height, exportHistory: []
+    worldWidth: dimensions.width, worldHeight: dimensions.height, botMode: false, exportHistory: []
   };
 }
 
@@ -69,7 +70,7 @@ function normalizeProject(stored: LegacyProjectState, fallbackCode: string, fall
     id: stored.id || crypto.randomUUID(), name: stored.name || fallbackName, createdAt: stored.createdAt || now, updatedAt: stored.updatedAt || now,
     files, folders: stored.folders || ['assets'], activeFileId, openFileIds: openFileIds.length ? openFileIds : [activeFileId],
     parameterValues: stored.parameterValues || {}, gridVisible: stored.gridVisible ?? true,
-    worldWidth: stored.worldWidth || 1080, worldHeight: stored.worldHeight || 1080, exportHistory: stored.exportHistory || []
+    worldWidth: stored.worldWidth || 1080, worldHeight: stored.worldHeight || 1080, botMode: stored.botMode ?? false, exportHistory: stored.exportHistory || []
   };
 }
 
