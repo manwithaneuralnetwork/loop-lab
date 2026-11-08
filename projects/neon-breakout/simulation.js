@@ -158,6 +158,7 @@ export function setup(world, params) {
 
   world.gameState = {
     score: 0, lives: params.lives, startingLives: params.lives, remaining,
+    brickHitsSincePaddle: 0,
     paddle, ball, scoreLabel, livesLabel, hint,
     serveFrames: 0, soundGate: 0, effects: [], finished: false, endFrames: 0, endReason: "",
     botPaddleX: null, botAim: null,
@@ -209,6 +210,7 @@ export function update(world, dt, params) {
 
   ball.color = params.ballColor;
   if (ball.touches(paddle) && ball.position.y < paddle.position.y) {
+    state.brickHitsSincePaddle = 0;
     if (state.botAim) {
       const dx = state.botAim.x - ball.position.x;
       const dy = state.botAim.y - ball.position.y;
@@ -228,7 +230,8 @@ export function update(world, dt, params) {
   for (const brick of world.tagged("brick")) {
     if (!ball.touches(brick)) continue;
     brick.destroy(); burst(world, state, brick);
-    state.score += 100 + Math.max(0, Math.floor((world.height - brick.position.y) / 20));
+    state.brickHitsSincePaddle += 1;
+    state.score += 100 + Math.max(0, Math.floor((world.height - brick.position.y) / 20)) + state.brickHitsSincePaddle * 5;
     state.remaining -= 1; bricksHit += 1;
   }
   if (bricksHit) playHit(world, state, 0.12, 1.35 + Math.min(0.35, bricksHit * 0.04));

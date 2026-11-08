@@ -120,13 +120,17 @@ function editorLanguageFor(path: string): string {
   return 'JavaScript';
 }
 
-function showFile(file: ProjectFile): void {
-  agentPanel?.close();
+function syncEditorToFile(file: ProjectFile): void {
   suppressEditorChange = true;
   editor.setCode(file.content);
   suppressEditorChange = false;
   editorFileStatus.textContent = file.path;
   editorLanguage.textContent = editorLanguageFor(file.path);
+}
+
+function showFile(file: ProjectFile): void {
+  agentPanel?.close();
+  syncEditorToFile(file);
 }
 
 let workspaceFiles: WorkspaceFiles;
@@ -142,7 +146,7 @@ const workspaceAgentApi = new WorkspaceAgentAPI({
   runtime: () => ({ playing: isPlaying, errors, profile: profileStatus.textContent || 'No profile yet' }),
   onFileWritten: (file) => {
     if (!project.openFileIds.includes(file.id)) project.openFileIds.push(file.id);
-    if (!agentPanel?.isOpen && project.activeFileId === file.id) showFile(file);
+    if (project.activeFileId === file.id) syncEditorToFile(file);
     workspaceFiles.render(); scheduleSave();
   },
   onRun: runCode
@@ -159,8 +163,7 @@ agentPanel = new AgentPanel(query<HTMLElement>('.editor'), {
     const restored = structuredClone(agentUndoSnapshot); agentUndoSnapshot = null; Object.assign(project, restored);
     await saveProject(project, false); workspaceFiles.render();
     const active = project.files.find((file) => file.id === project.activeFileId && file.kind === 'code') || entryFile();
-    suppressEditorChange = true; editor.setCode(active.content); suppressEditorChange = false;
-    editorFileStatus.textContent = active.path; editorLanguage.textContent = editorLanguageFor(active.path); runCode(); return true;
+    syncEditorToFile(active); runCode(); return true;
   },
   runProject: runCode,
   onNotice: (message) => addLog(message, 'ok')
