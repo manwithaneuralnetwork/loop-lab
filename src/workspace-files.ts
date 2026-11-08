@@ -21,11 +21,14 @@ export class WorkspaceFiles {
   private readonly tabs: HTMLElement;
   private readonly importInput: HTMLInputElement;
   private selectedPath = '';
+  private readonly collapsedFolders = new Set<string>();
+  private explorerCollapsed = false;
 
   constructor(private readonly project: ProjectState, private readonly options: WorkspaceFilesOptions) {
     this.list = document.querySelector('.files') as HTMLElement;
     this.tabs = document.querySelector('.tabs') as HTMLElement;
     const topAdd = document.querySelector('.panel-title .add-button') as HTMLButtonElement;
+    const explorerToggle = document.querySelector('.explorer-toggle') as HTMLButtonElement;
     const importButton = document.querySelector('.new-file') as HTMLButtonElement;
     this.importInput = document.createElement('input');
     this.importInput.type = 'file';
@@ -33,6 +36,12 @@ export class WorkspaceFiles {
     this.importInput.hidden = true;
     document.body.append(this.importInput);
     topAdd.addEventListener('click', () => void this.createFile(''));
+    explorerToggle.addEventListener('click', () => {
+      this.explorerCollapsed = !this.explorerCollapsed;
+      explorerToggle.setAttribute('aria-expanded', String(!this.explorerCollapsed));
+      explorerToggle.classList.toggle('collapsed', this.explorerCollapsed);
+      this.list.hidden = this.explorerCollapsed;
+    });
     importButton.addEventListener('click', () => this.importInput.click());
     this.importInput.addEventListener('change', () => void this.importFiles());
     this.render();
@@ -54,38 +63,55 @@ export class WorkspaceFiles {
 
   private renderExplorer(): void {
     this.list.innerHTML = '';
-    const rootFiles = this.project.files.filter((file) => !dirname(file.path));
-    rootFiles.forEach((file) => this.list.append(this.fileRow(file, false)));
-    const folderNames = [...new Set([
+    const folderNames = new Set([
       ...this.project.folders,
       ...this.project.files.map((file) => dirname(file.path)).filter(Boolean)
-    ])].sort();
-    folderNames.forEach((folder) => {
-      const folderRow = document.createElement('div');
-      folderRow.className = `file-row folder-row ${this.selectedPath === folder ? 'selected' : ''}`;
-      const select = document.createElement('button');
-      select.className = 'file-main directory';
-      select.innerHTML = '<span class="chevron-down"></span>';
-      select.append(document.createTextNode(folder));
-      select.addEventListener('click', () => { this.selectedPath = folder; this.renderExplorer(); });
-      const add = document.createElement('button');
-      add.className = 'file-action'; add.title = 'Add empty file'; add.textContent = '+';
-      add.addEventListener('click', () => void this.createFile(folder));
-      const rename = document.createElement('button');
-      rename.className = 'file-action'; rename.title = 'Rename folder'; rename.textContent = '✎';
-      rename.addEventListener('click', () => void this.renameFolder(folder));
-      const remove = document.createElement('button');
-      remove.className = 'file-action danger'; remove.title = 'Delete folder'; remove.textContent = '×';
-      remove.addEventListener('click', () => void this.deleteFolder(folder));
-      folderRow.append(select, add, rename, remove);
-      this.list.append(folderRow);
-      this.project.files.filter((file) => dirname(file.path) === folder).forEach((file) => this.list.append(this.fileRow(file, true)));
+    ]);
+    [...folderNames].forEach((folder) => {
+      const parts = folder.split('/');
+      for (let index = 1; index < parts.length; index += 1) folderNames.add(parts.slice(0, index).join('/'));
     });
+    this.project.files.filter((file) => !dirname(file.path)).sort((a, b) => a.path.localeCompare(b.path)).forEach((file) => this.list.append(this.fileRow(file, 0)));
+    [...folderNames].filter((folder) => !dirname(folder)).sort().forEach((folder) => this.renderFolder(folder, folderNames, 0));
   }
 
-  private fileRow(file: ProjectFile, nested: boolean): HTMLElement {
+  private renderFolder(folder: string, folders: Set<string>, depth: number): void {
+    const folderRow = document.createElement('div');
+    const collapsed = this.collapsedFolders.has(folder);
+    folderRow.className = `file-row folder-row ${this.selectedPath === folder ? 'selected' : ''}`;
+    folderRow.style.setProperty('--tree-depth', String(depth));
+    folderRow.setAttribute('role', 'treeitem');
+    folderRow.setAttribute('aria-expanded', String(!collapsed));
+    const select = document.createElement('button');
+    select.className = 'file-main directory';
+    select.innerHTML = `<span class="chevron-down ${collapsed ? 'collapsed' : ''}"></span>`;
+    select.append(document.createTextNode(filename(folder)));
+    select.addEventListener('click', () => {
+      this.selectedPath = folder;
+      if (collapsed) this.collapsedFolders.delete(folder); else this.collapsedFolders.add(folder);
+      this.renderExplorer();
+    });
+    const actions = document.createElement('div'); actions.className = 'file-actions';
+    const add = document.createElement('button');
+    add.className = 'file-action'; add.title = 'Add empty file'; add.setAttribute('aria-label', `Add file to ${folder}`); add.textContent = '+';
+    add.addEventListener('click', () => void this.createFile(folder));
+    const rename = document.createElement('button');
+    rename.className = 'file-action'; rename.title = 'Rename folder'; rename.setAttribute('aria-label', `Rename ${folder}`); rename.textContent = '✎';
+    rename.addEventListener('click', () => void this.renameFolder(folder));
+    const remove = document.createElement('button');
+    remove.className = 'file-action danger'; remove.title = 'Delete folder'; remove.setAttribute('aria-label', `Delete ${folder}`); remove.textContent = '×';
+    remove.addEventListener('click', () => void this.deleteFolder(folder));
+    actions.append(add, rename, remove); folderRow.append(select, actions); this.list.append(folderRow);
+    if (collapsed) return;
+    this.project.files.filter((file) => dirname(file.path) === folder).sort((a, b) => a.path.localeCompare(b.path)).forEach((file) => this.list.append(this.fileRow(file, depth + 1)));
+    [...folders].filter((candidate) => dirname(candidate) === folder).sort().forEach((child) => this.renderFolder(child, folders, depth + 1));
+  }
+
+  private fileRow(file: ProjectFile, depth: number): HTMLElement {
     const row = document.createElement('div');
-    row.className = `file-row ${nested ? 'nested' : ''} ${file.id === this.project.activeFileId ? 'active' : ''}`;
+    row.className = `file-row ${depth ? 'nested' : ''} ${file.id === this.project.activeFileId ? 'active' : ''}`;
+    row.style.setProperty('--tree-depth', String(depth));
+    row.setAttribute('role', 'treeitem');
     const select = document.createElement('button');
     select.className = 'file-main';
     const badge = document.createElement('span');
@@ -93,13 +119,14 @@ export class WorkspaceFiles {
     badge.textContent = icon(file);
     select.append(badge, document.createTextNode(filename(file.path)));
     select.addEventListener('click', () => this.activate(file));
+    const actions = document.createElement('div'); actions.className = 'file-actions';
     const rename = document.createElement('button');
     rename.className = 'file-action'; rename.title = 'Rename file'; rename.textContent = '✎';
     rename.addEventListener('click', () => void this.renameFile(file));
     const remove = document.createElement('button');
     remove.className = 'file-action danger'; remove.title = 'Delete file'; remove.textContent = '×';
     remove.addEventListener('click', () => void this.deleteFile(file));
-    row.append(select, rename, remove);
+    actions.append(rename, remove); row.append(select, actions);
     return row;
   }
 
@@ -120,7 +147,6 @@ export class WorkspaceFiles {
       tab.addEventListener('click', () => this.activate(file));
       this.tabs.append(tab);
     });
-    const spacer = document.createElement('em'); spacer.textContent = '▥'; this.tabs.append(spacer);
   }
 
   private activate(file: ProjectFile): void {
@@ -177,17 +203,23 @@ export class WorkspaceFiles {
     const value = await this.requestValue('Rename folder', 'Folder name', folder);
     const requested = value?.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
     if (!requested || requested === folder || this.project.folders.includes(requested)) return;
-    this.project.folders = this.project.folders.map((name) => name === folder ? requested : name);
-    this.project.files.forEach((file) => { if (dirname(file.path) === folder) file.path = `${requested}/${filename(file.path)}`; });
+    const requestedParent = dirname(folder);
+    const replacement = requestedParent ? `${requestedParent}/${filename(requested)}` : filename(requested);
+    const conflicts = this.project.folders.some((name) => name !== folder && name === replacement);
+    if (conflicts) return;
+    this.project.folders = this.project.folders.map((name) => name === folder || name.startsWith(`${folder}/`) ? `${replacement}${name.slice(folder.length)}` : name);
+    this.project.files.forEach((file) => { if (dirname(file.path) === folder || file.path.startsWith(`${folder}/`)) file.path = `${replacement}${file.path.slice(folder.length)}`; });
+    if (this.collapsedFolders.delete(folder)) this.collapsedFolders.add(replacement);
     this.render(); this.options.onChange();
   }
 
   private async deleteFolder(folder: string): Promise<void> {
-    const contained = this.project.files.filter((file) => dirname(file.path) === folder);
+    const contained = this.project.files.filter((file) => dirname(file.path) === folder || file.path.startsWith(`${folder}/`));
     if (!await this.confirmAction('Delete folder', `Delete ${folder}${contained.length ? ` and ${contained.length} contained file(s)` : ''}? This cannot be undone.`)) return;
     const ids = new Set(contained.map((file) => file.id));
     this.project.files = this.project.files.filter((file) => !ids.has(file.id));
-    this.project.folders = this.project.folders.filter((name) => name !== folder);
+    this.project.folders = this.project.folders.filter((name) => name !== folder && !name.startsWith(`${folder}/`));
+    [...this.collapsedFolders].filter((name) => name === folder || name.startsWith(`${folder}/`)).forEach((name) => this.collapsedFolders.delete(name));
     this.project.openFileIds = this.project.openFileIds.filter((id) => !ids.has(id));
     if (ids.has(this.project.activeFileId)) this.activate(this.project.files.find((file) => file.kind === 'code')!);
     else { this.render(); this.options.onChange(); }

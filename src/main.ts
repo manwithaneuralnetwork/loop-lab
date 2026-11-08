@@ -43,7 +43,10 @@ const logs = query<HTMLElement>('.logs');
 const properties = query<HTMLElement>('.properties');
 const saveState = query<HTMLElement>('.crumbs em');
 const liveStatus = query<HTMLElement>('.live-status');
-const problemCount = query<HTMLElement>('.console-tabs button:nth-child(2) b');
+const problemCount = query<HTMLElement>('.problem-summary b');
+const cursorPosition = query<HTMLElement>('.cursor-position');
+const editorFileStatus = query<HTMLElement>('.editor-file-status');
+const editorLanguage = query<HTMLElement>('.editor-language');
 const profileStatus = query<HTMLElement>('.profile-status');
 query<HTMLElement>('.crumbs > strong').textContent = project.name;
 document.title = `${project.name} — Loop Lab`;
@@ -98,14 +101,27 @@ const editor = createCodeEditor(query<HTMLElement>('#codeEditor'), activeAtStart
   const active = project.files.find((file) => file.id === project.activeFileId);
   if (active?.kind === 'code') active.content = code;
   scheduleSave();
-}, runCode, () => project.files.map((file) => file.path));
+}, runCode, () => project.files.map((file) => file.path), (line, column) => {
+  cursorPosition.textContent = `Ln ${line}, Col ${column}`;
+});
 
-query<HTMLButtonElement>('.activity div:first-child button:nth-child(2)').addEventListener('click', () => editor.openSearch());
+query<HTMLButtonElement>('.activity [data-view="search"]').addEventListener('click', () => editor.openSearch());
+
+function editorLanguageFor(path: string): string {
+  if (path.endsWith('.ts')) return 'TypeScript';
+  if (path.endsWith('.json')) return 'JSON';
+  if (path.endsWith('.css')) return 'CSS';
+  if (path.endsWith('.html')) return 'HTML';
+  if (path.endsWith('.md')) return 'Markdown';
+  return 'JavaScript';
+}
 
 function showFile(file: ProjectFile): void {
   suppressEditorChange = true;
   editor.setCode(file.content);
   suppressEditorChange = false;
+  editorFileStatus.textContent = file.path;
+  editorLanguage.textContent = editorLanguageFor(file.path);
 }
 
 let workspaceFiles: WorkspaceFiles;
@@ -121,6 +137,8 @@ const dashboard = new ProjectDashboard(project, {
 });
 query<HTMLButtonElement>('.projects-link').addEventListener('click', () => void dashboard.open());
 query<HTMLButtonElement>('.project-back').addEventListener('click', () => void dashboard.open());
+query<HTMLButtonElement>('.activity [data-view="projects"]').addEventListener('click', () => void dashboard.open());
+showFile(activeAtStart);
 setSaveState(true);
 
 const runtime = new RuntimeBridge(viewport, handleRuntimeMessage, project.worldWidth, project.worldHeight);

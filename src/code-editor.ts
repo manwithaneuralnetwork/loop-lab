@@ -147,7 +147,8 @@ export function createCodeEditor(
   initialCode: string,
   onChange: (code: string) => void,
   onRun: () => void,
-  getProjectPaths: () => string[] = () => []
+  getProjectPaths: () => string[] = () => [],
+  onCursorChange: (line: number, column: number) => void = () => {}
 ): CodeEditor {
   const view = new EditorView({
     doc: initialCode,
@@ -171,10 +172,16 @@ export function createCodeEditor(
       keymap.of([indentWithTab, { key: 'Mod-Enter', run: () => { onRun(); return true; } }]),
       EditorView.updateListener.of((update) => {
         if (update.docChanged) onChange(update.state.doc.toString());
+        if (update.selectionSet || update.docChanged) {
+          const head = update.state.selection.main.head;
+          const line = update.state.doc.lineAt(head);
+          onCursorChange(line.number, head - line.from + 1);
+        }
       })
     ],
     parent
   });
+  onCursorChange(1, 1);
   return {
     getCode: () => view.state.doc.toString(),
     setCode: (code: string) => view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: code } }),
