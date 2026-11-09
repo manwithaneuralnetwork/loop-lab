@@ -1,5 +1,8 @@
 import { createProjectState, type ProjectState } from './project-store';
 import { BOUNCING_BALLS_CODE, BOUNCING_BALLS_HELPERS } from './samples/bouncing-balls';
+import neonBreakoutCode from '../projects/neon-breakout/simulation.js?raw';
+import neonBreakoutBot from '../projects/neon-breakout/bot.js?raw';
+import particleCascadeCode from '../projects/particle-cascade/simulation.js?raw';
 
 export interface ProjectTemplate {
   id: string;
@@ -8,6 +11,8 @@ export interface ProjectTemplate {
   accent: string;
   create(projectName: string): ProjectState;
 }
+
+export interface StarterProject extends ProjectTemplate { tags: string[] }
 
 const BLANK_CODE = `// A minimal Loop Lab project.
 export const parameters = {
@@ -65,5 +70,23 @@ export const PROJECT_TEMPLATES: ProjectTemplate[] = [
   {
     id: 'pointer-field', name: 'Pointer Field', description: 'An interactive particle field for testing mouse and touch input.', accent: '#62d6a5',
     create: (name) => createProjectState(name, POINTER_CODE, [], { width: 960, height: 540 })
+  }
+];
+
+export const STARTER_PROJECTS: StarterProject[] = [
+  {
+    id: 'neon-breakout-starter', name: 'Neon Breakout',
+    description: 'A complete playable game with deterministic physics, bot automation, scoring, effects, and video export.',
+    accent: '#ff6b2c', tags: ['Game', 'Bot', 'Export'],
+    create: (name) => {
+      const project = createProjectState(name, neonBreakoutCode, [{ path: 'bot.js', content: neonBreakoutBot }], { width: 720, height: 960 });
+      project.botMode = true; return project;
+    }
+  },
+  {
+    id: 'particle-cascade-starter', name: 'Particle Cascade',
+    description: 'A polished generative chain reaction with exposed motion, timing, color, and reaction controls.',
+    accent: '#62d6a5', tags: ['Generative', 'Particles', 'Export'],
+    create: (name) => createProjectState(name, particleCascadeCode, [], { width: 900, height: 900 })
   }
 ];

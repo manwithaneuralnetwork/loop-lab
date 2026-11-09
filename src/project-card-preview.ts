@@ -27,9 +27,11 @@ export class ProjectCardPreview {
       if (!entry) throw new Error('No simulation entry file.');
       const botEntry = project.botMode && sources['bot.js'] ? 'bot.js' : null;
       this.runtime.loadProject(sources, entry, project.parameterValues, assets, botEntry);
-      this.renderer = new CanvasRenderer(canvas.transferControlToOffscreen()); this.renderer.resize(440, 280);
+      this.renderer = new CanvasRenderer(canvas.transferControlToOffscreen());
+      const scale = Math.min(1, 480 / Math.max(project.worldWidth, project.worldHeight));
+      this.renderer.resize(Math.max(1, Math.round(project.worldWidth * scale)), Math.max(1, Math.round(project.worldHeight * scale)));
       for (let frame = 0; frame < 72 && !this.runtime.world.finished; frame += 1) this.runtime.step();
-      this.renderer.render(this.runtime.world); this.host.dataset.preview = 'ready';
+      this.renderer.render(this.runtime.world); this.host.dataset.preview = 'ready'; this.host.dataset.previewFrame = String(this.runtime.frame);
       this.host.addEventListener('pointerenter', this.play);
       this.host.addEventListener('pointerleave', this.pause);
       this.host.addEventListener('focusin', this.play);
@@ -46,7 +48,7 @@ export class ProjectCardPreview {
 
   private readonly play = (): void => {
     if (!this.runtime || !this.renderer) return;
-    if (this.runtime.world.finished) this.runtime.restart();
+    this.runtime.restart(); this.renderer.render(this.runtime.world); this.host.dataset.previewFrame = '0';
     this.framesRemaining = 180; this.host.dataset.preview = 'playing';
     if (!this.animationFrame) this.animationFrame = requestAnimationFrame(this.tick);
   };
@@ -59,7 +61,7 @@ export class ProjectCardPreview {
   private readonly tick = (): void => {
     this.animationFrame = 0;
     if (!this.runtime || !this.renderer || this.framesRemaining <= 0) { this.host.dataset.preview = 'ready'; return; }
-    this.runtime.step(); this.renderer.render(this.runtime.world); this.framesRemaining -= 1;
+    this.runtime.step(); this.renderer.render(this.runtime.world); this.host.dataset.previewFrame = String(this.runtime.frame); this.framesRemaining -= 1;
     if (!this.runtime.world.finished && this.framesRemaining > 0) this.animationFrame = requestAnimationFrame(this.tick);
     else this.host.dataset.preview = 'ready';
   };

@@ -1,5 +1,5 @@
 import { activateProject, duplicateProject, listProjects, saveProject, storeProject, type ProjectState } from './project-store';
-import { PROJECT_TEMPLATES, type ProjectTemplate } from './project-templates';
+import { PROJECT_TEMPLATES, STARTER_PROJECTS, type ProjectTemplate } from './project-templates';
 import { ProjectCardPreview } from './project-card-preview';
 import { SimulationRuntime } from './engine/simulation';
 import { ExportDialog, type ExportSource } from './export/export-dialog';
@@ -34,7 +34,8 @@ export class ProjectDashboard {
       <header><div class="dashboard-brand"><span class="brand-mark"><i></i><i></i></span><strong>LOOP LAB</strong><b>/</b><span>Projects</span></div><div><button class="dashboard-close">Back to workspace</button><button class="primary dashboard-new">＋ New project</button></div></header>
       <main><div class="dashboard-intro"><div><span>YOUR WORKSPACE</span><h1>Projects</h1><p>Start small, iterate quickly, and keep every experiment in one place.</p></div></div>
       <section><div class="dashboard-section-title"><h2>Recent projects</h2><span class="project-count"></span></div><div class="project-grid recent-projects"></div></section>
-      <section><div class="dashboard-section-title"><h2>Start from a template</h2><span>Three focused starting points</span></div><div class="project-grid template-projects"></div></section></main>`;
+      <section><div class="dashboard-section-title"><h2>Start from a template</h2><span>Three focused starting points</span></div><div class="project-grid template-projects"></div></section>
+      <section><div class="dashboard-section-title"><h2>Starter projects</h2><span>Complete examples ready to remix</span></div><div class="starter-projects"></div></section></main>`;
     document.body.append(this.root);
     new ExportDialog(this.exportTrigger, () => exportSource(this.exportProject), (entry) => {
       this.exportProject.exportHistory.unshift(entry); this.exportProject.exportHistory = this.exportProject.exportHistory.slice(0, 12);
@@ -43,6 +44,7 @@ export class ProjectDashboard {
     this.root.querySelector('.dashboard-close')?.addEventListener('click', () => this.close());
     this.root.querySelector('.dashboard-new')?.addEventListener('click', () => this.showCreateDialog(PROJECT_TEMPLATES[0]));
     this.renderTemplates();
+    this.renderStarters();
   }
 
   async open(): Promise<void> { this.options.onOpen(); this.projects = await listProjects(); this.renderProjects(); this.root.hidden = false; }
@@ -74,6 +76,19 @@ export class ProjectDashboard {
       card.innerHTML = `<span class="template-icon">＋</span><div><h3></h3><p></p></div><span class="template-arrow">→</span>`;
       card.querySelector('h3')!.textContent = template.name; card.querySelector('p')!.textContent = template.description;
       card.addEventListener('click', () => this.showCreateDialog(template)); grid.append(card);
+    }
+  }
+
+  private renderStarters(): void {
+    const grid = this.root.querySelector<HTMLElement>('.starter-projects')!;
+    for (const starter of STARTER_PROJECTS) {
+      const card = document.createElement('article'); card.className = 'starter-card'; card.style.setProperty('--starter-accent', starter.accent);
+      card.innerHTML = `<div class="starter-mark"><span>COMPLETE PROJECT</span><i>◆</i></div><div class="starter-copy"><h3></h3><p></p><div class="starter-tags"></div></div><button type="button">Use starter <span>→</span></button>`;
+      card.querySelector('h3')!.textContent = starter.name; card.querySelector('p')!.textContent = starter.description;
+      const tags = card.querySelector<HTMLElement>('.starter-tags')!;
+      starter.tags.forEach((tag) => { const item = document.createElement('span'); item.textContent = tag; tags.append(item); });
+      card.querySelector('button')?.addEventListener('click', () => this.showCreateDialog(starter, `${starter.name} Remix`));
+      grid.append(card);
     }
   }
 
@@ -114,10 +129,11 @@ export class ProjectDashboard {
     this.projects = await listProjects(); this.renderProjects(); this.options.onNotice(`Updated settings for ${project.name}.`);
   }
 
-  private showCreateDialog(template: ProjectTemplate): void {
+  private showCreateDialog(template: ProjectTemplate, suggestedName = 'Untitled Project'): void {
     const dialog = document.createElement('dialog'); dialog.className = 'file-dialog new-project-dialog';
-    dialog.innerHTML = `<form method="dialog"><span>NEW PROJECT</span><h3>Create from ${template.name}</h3><p>${template.description}</p><label>Project name<input name="name" maxlength="64" value="Untitled Project" autocomplete="off"></label><footer><button value="cancel">Cancel</button><button value="create" class="primary">Create project</button></footer></form>`;
+    dialog.innerHTML = `<form method="dialog"><span>NEW PROJECT</span><h3>Create from ${template.name}</h3><p>${template.description}</p><label>Project name<input name="name" maxlength="64" autocomplete="off"></label><footer><button value="cancel">Cancel</button><button value="create" class="primary">Create project</button></footer></form>`;
     document.body.append(dialog); const input = dialog.querySelector<HTMLInputElement>('input')!;
+    input.value = suggestedName;
     dialog.addEventListener('close', () => { if (dialog.returnValue === 'create') void this.create(template, input.value); dialog.remove(); });
     dialog.showModal(); input.select();
   }
