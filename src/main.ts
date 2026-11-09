@@ -104,7 +104,7 @@ const editor = createCodeEditor(query<HTMLElement>('#codeEditor'), activeAtStart
   if (suppressEditorChange) return;
   const active = project.files.find((file) => file.id === project.activeFileId);
   if (active?.kind === 'code') active.content = code;
-  scheduleSave();
+  markRuntimeDirty(); scheduleSave();
 }, runCode, () => project.files.map((file) => file.path), (line, column) => {
   cursorPosition.textContent = `Ln ${line}, Col ${column}`;
 });
@@ -183,7 +183,7 @@ const dashboard = new ProjectDashboard(project, {
   onNavigate: () => { navigatingToProject = true; if (saveTimer) clearTimeout(saveTimer); },
   onOpen: () => { resumeAfterDashboard = isPlaying; runtime.post({ type: 'play', playing: false }); void runtime.suspendAudio(); },
   onClose: () => {
-    if (dashboardProjectChanged) { dashboardProjectChanged = false; runCode(); }
+    if (dashboardProjectChanged) { dashboardProjectChanged = false; markRuntimeDirty(); }
     else if (resumeAfterDashboard) { void runtime.resumeAudio(); runtime.post({ type: 'play', playing: true }); }
   },
   onProjectUpdated: (updated) => {
@@ -191,7 +191,7 @@ const dashboard = new ProjectDashboard(project, {
     worldWidthInput.value = String(updated.worldWidth); worldHeightInput.value = String(updated.worldHeight); applyViewportAspect();
     viewport.classList.toggle('grid-off', !updated.gridVisible); gridButton.classList.toggle('inactive', !updated.gridVisible);
     botModeButton.classList.toggle('active', updated.botMode); botModeButton.setAttribute('aria-pressed', String(updated.botMode));
-    runtime.resize(updated.worldWidth, updated.worldHeight); dashboardProjectChanged = true;
+    dashboardProjectChanged = true;
   }
 });
 query<HTMLButtonElement>('.projects-link').addEventListener('click', () => void dashboard.open());
@@ -247,13 +247,18 @@ function runCode(): void {
   void runtime.resumeAudio();
   const entry = entryFile();
   if (project.activeFileId === entry.id) entry.content = editor.getCode();
-  void persistProject(); pendingCode = entry.content; logs.innerHTML = ''; errors = 0; problemCount.textContent = '0';
+  void persistProject(); runtime.resize(project.worldWidth, project.worldHeight); pendingCode = entry.content; logs.innerHTML = ''; errors = 0; problemCount.textContent = '0';
+  runButton.classList.remove('pending'); runButton.title = 'Run code';
   addLog('Compiling simulation…'); runtime.replace(); isPlaying = true; playButton.textContent = 'Ⅱ'; setRuntimeStatus('live');
+}
+
+function markRuntimeDirty(): void {
+  runButton.classList.add('pending'); runButton.title = 'Run code — apply saved changes';
 }
 
 function updateParameter(key: string, value: ParameterValue): void {
   currentParams[key] = value; project.parameterValues[key] = value;
-  runtime.post({ type: 'params', params: { [key]: value } }); scheduleSave();
+  markRuntimeDirty(); scheduleSave();
 }
 
 function renderParameters(schema: ParameterSchema, values: ParameterValues): void {
@@ -357,7 +362,7 @@ botModeButton.addEventListener('click', () => {
   project.botMode = !project.botMode; botModeButton.classList.toggle('active', project.botMode);
   botModeButton.setAttribute('aria-pressed', String(project.botMode));
   addLog(project.botMode ? 'Input provider changed to bot.js.' : 'Input provider changed to live user input.', 'ok');
-  scheduleSave(); runCode();
+  markRuntimeDirty(); scheduleSave();
 });
 
 worldWidthInput.value = String(project.worldWidth); worldHeightInput.value = String(project.worldHeight);
@@ -365,7 +370,7 @@ function applyViewportAspect(): void { viewport.style.aspectRatio = `${project.w
 applyViewportAspect();
 function updateDimensions(): void {
   project.worldWidth = Math.max(64, Math.min(4096, Number(worldWidthInput.value) || 1080)); project.worldHeight = Math.max(64, Math.min(4096, Number(worldHeightInput.value) || 1080));
-  worldWidthInput.value = String(project.worldWidth); worldHeightInput.value = String(project.worldHeight); applyViewportAspect(); runtime.resize(project.worldWidth, project.worldHeight); runtime.post({ type: 'restart' }); scheduleSave();
+  worldWidthInput.value = String(project.worldWidth); worldHeightInput.value = String(project.worldHeight); applyViewportAspect(); markRuntimeDirty(); scheduleSave();
 }
 let dimensionTimer: ReturnType<typeof setTimeout> | null = null;
 function scheduleDimensionUpdate(): void { if (dimensionTimer) clearTimeout(dimensionTimer); dimensionTimer = setTimeout(updateDimensions, 250); }

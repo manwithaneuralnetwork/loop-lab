@@ -49,7 +49,7 @@ export class ProjectCardPreview {
   private readonly play = (): void => {
     if (!this.runtime || !this.renderer) return;
     this.runtime.restart(); this.renderer.render(this.runtime.world); this.host.dataset.previewFrame = '0';
-    this.framesRemaining = 180; this.host.dataset.preview = 'playing';
+    this.framesRemaining = 360; this.host.dataset.preview = 'playing';
     if (!this.animationFrame) this.animationFrame = requestAnimationFrame(this.tick);
   };
 

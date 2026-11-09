@@ -79,6 +79,7 @@
 .app-actions .run-button, .app-actions .export-button { min-width: auto; padding-inline: 11px; font-size: 10px; }
 .app-actions .run-button { display: inline-flex; align-items: center; gap: 7px; border: 1px solid #3b3e43; background: #202226; color: #c0c3c8; }
 .app-actions .run-button:hover { border-color: #575b62; background: #292c31; color: #fff; }
+.app-actions .run-button.pending { border-color: #ff6b2c; color: #fff1e9; box-shadow: inset 0 0 0 1px rgba(255,107,44,.18); }
 .app-actions .export-button { padding-inline: 13px; }
 .play-icon { width: 0; height: 0; border-top: 4px solid transparent; border-bottom: 4px solid transparent; border-left: 6px solid currentColor; }
 .stagebar { padding-inline: 8px; }
